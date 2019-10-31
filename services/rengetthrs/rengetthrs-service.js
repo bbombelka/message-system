@@ -1,11 +1,4 @@
-const express = require('express'),
-  server = express(),
-  user = require('./user'),
-  PORT = 8000,
-  threadsDatabase = require('./threads');
-
-server.use(express.urlencoded());
-server.use(express.json());
+const server = require('../../index');
 
 server.post('/rengetthrs', (request, response) => {
   const { body } = request;
@@ -22,8 +15,6 @@ server.post('/rengetthrs', (request, response) => {
 
   response.json(responseBody);
 });
-
-server.listen(PORT, () => console.log(`Server is running on port ${PORT}!`));
 
 const processRequest = params => {
   const numberOfItemsOnServer = threadsDatabase.length;
