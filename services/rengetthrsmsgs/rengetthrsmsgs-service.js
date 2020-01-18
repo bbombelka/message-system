@@ -12,14 +12,11 @@ module.exports = {
     } else response.status(500);
 
     if (typeof responseBody === 'string') {
-      response.status(500).send(responseBody);
+      response.status(404).send(responseBody);
     }
 
     responseBody = ServiceHelper.formatResponse(responseBody);
 
     response.json(responseBody);
-
-    // response.send('rengetthrsmsgs is working fine!');
-    // response.end();
   },
 };

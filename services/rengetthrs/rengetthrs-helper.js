@@ -5,7 +5,7 @@ class RengetthrsHelper {
     const numberOfThreadsOnServer = threadsDatabase.length;
     const numberOfThreadsToSend = params.numrec;
     const numberOfThreadsToIgnore = params.skip;
-
+    console.log(params);
     if (
       numberOfThreadsToSend > numberOfThreadsOnServer ||
       numberOfThreadsToIgnore > numberOfThreadsOnServer
