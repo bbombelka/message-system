@@ -2,7 +2,8 @@ const express = require('express'),
   server = express(),
   PORT = 8000,
   rengetthrs = require('./services/rengetthrs/rengetthrs-service'),
-  rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service');
+  rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service'),
+  logger = require('./middleware/logger');
 
 server.use(express.urlencoded());
 server.use(express.json());
@@ -12,6 +13,7 @@ server.use((req, res, next) => {
   res.append('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
+server.use(logger.log);
 server.post('/rengetthrs', rengetthrs.rengetthrsService);
 server.post('/rengetthrsmsgs', rengetthrsmsgs.service);
 
