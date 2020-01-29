@@ -1,39 +1,57 @@
 const path = require('path');
 const fs = require('fs');
-
-module.exports = {
-  log: function(request, response, next) {
-    const date = getDate();
-    const serviceName = request.url.slice(1);
-    const folderPath = path.join(__dirname.replace('middleware', ''), 'logs', date.slice(0, 10));
-
-    const writeLogDataToFile = () => {
-      const { body, headers, method } = request;
-      const { statusCode } = response;
-      const fileData = `
-      REQUEST:
-      body: ${JSON.stringify(body)} user-agent: ${headers['user-agent']} method: ${method}
-      RESPONSE: 
-      status code:${statusCode}`;
-
-      fs.appendFile(
-        path.join(folderPath, serviceName + '.txt'),
-        formatLog(fileData),
-        err => new Error(err),
-      );
+const helper = require('./logger-helper');
+class Logger {
+  constructor() {
+    this.state = {
+      availableServices: this.determineAvailableServices(),
     };
+  }
+  determineAvailableServices = () => {
+    fs.readdir(path.join(__dirname.replace('middleware', ''), 'services'), (err, dirContent) => {
+      if (err) return new Error(err);
+      const actualAvailableServices = dirContent.filter(item => !/\./.test(item));
+      this.state.availableServices = [...actualAvailableServices];
+    });
+  };
+  log = (request, response, next) => {
+    this.setState(request, response);
 
-    fs.mkdir(folderPath, () => writeLogDataToFile(request, response));
+    const { folderPath, serviceName, availableServices } = this.state;
+
+    fs.mkdir(folderPath, () => {
+      if (availableServices.includes(serviceName)) {
+        this.writeLogDataToFile(request, response);
+      } // jako else mozna dodać robienie logow w innym miejscu
+    });
     next();
-  },
-};
+  };
+  setState = (request, response) => {
+    const folderPath = path.join(
+      __dirname.replace('middleware', ''),
+      'logs',
+      helper.getDate().slice(0, 10),
+    );
 
-const formatLog = log => '\n' + '*'.repeat(30) + '\n\t' + getDate() + '\n' + log;
+    this.state = {
+      ...this.state,
+      request,
+      response,
+      folderPath,
+      serviceName: request.url.slice(1),
+    };
+  };
 
-const getDate = () => formatDate(new Date());
+  writeLogDataToFile = () => {
+    const { request, response, folderPath, serviceName } = this.state;
+    const logFileData = helper.getLogFileData(request, response);
 
-const formatDate = date =>
-  date
-    .toISOString()
-    .replace(/T|Z/g, ' ')
-    .trim();
+    fs.appendFile(
+      path.join(folderPath, serviceName + '.txt'),
+      helper.formatLog(logFileData),
+      err => new Error(err),
+    );
+  };
+}
+
+module.exports = new Logger();
