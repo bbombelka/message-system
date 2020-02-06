@@ -3,7 +3,8 @@ const express = require('express'),
   PORT = 8000,
   rengetthrs = require('./services/rengetthrs/rengetthrs-service'),
   rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service'),
-  logger = require('./middleware/logger');
+  logger = require('./middleware/logger'),
+  helper = require('./server-helper');
 
 server.use(express.urlencoded());
 server.use(express.json());
@@ -17,4 +18,8 @@ server.use(logger.log);
 server.post('/rengetthrs', rengetthrs.rengetthrsService);
 server.post('/rengetthrsmsgs', rengetthrsmsgs.service);
 
-server.listen(PORT, () => console.log(`Server is running on port ${PORT}!`));
+server.listen(PORT, () => {
+  helper.setupDatabase();
+
+  console.log(`Server is running on port ${PORT}!`);
+});

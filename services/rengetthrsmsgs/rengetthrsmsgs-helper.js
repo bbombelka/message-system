@@ -1,11 +1,12 @@
-const messageDatabase = require('../../messages');
+const fs = require('fs');
+const path = require('path');
 
 class RengetthrsmsgsHelper {
-  static processRequest(params) {
-    const parentThreadMessages = this.getMessagesFromParentThread(params.ref);
+  static processRequest({ ref, numrec, skip }) {
+    const parentThreadMessages = this.getMessagesFromParentThread(ref.trim());
     const numberOfMessagesOnServer = parentThreadMessages.length;
-    const numberOfMessagesToSend = params.numrec;
-    const numberOfMessagesToIgnore = params.skip;
+    const numberOfMessagesToSend = numrec;
+    const numberOfMessagesToIgnore = skip;
 
     if (
       numberOfMessagesToSend > numberOfMessagesOnServer || // to moze przeniesc do glownego service helpera
@@ -18,9 +19,10 @@ class RengetthrsmsgsHelper {
       numberOfMessagesToSend,
       numberOfMessagesToIgnore,
     );
-
+    const messagesToSend = this.selectMessagesToSend(parentThreadMessages, selectParams);
+    this.markAsRead(this.selectMessagesToSend(parentThreadMessages, selectParams));
     return {
-      messages: parentThreadMessages.slice(...selectParams),
+      messages: messagesToSend,
       total: numberOfMessagesOnServer,
     };
   }
@@ -33,7 +35,21 @@ class RengetthrsmsgsHelper {
   }
 
   static getMessagesFromParentThread(threadRef) {
+    const messageDatabase = this.getDbData();
     return messageDatabase.filter(message => message.ref === threadRef)[0]['msgs'];
+  }
+
+  static selectMessagesToSend(messages, range) {
+    return messages.filter((_, idx) => idx >= Math.min(...range) && idx < Math.max(...range));
+  }
+
+  static markAsRead(messages) {
+    messages.forEach((_, idx, arr) => (arr[idx].read = 'T'));
+  }
+
+  static getDbData() {
+    const filePath = path.join(__dirname, '..', '..', 'database', 'messages.json');
+    return JSON.parse(fs.readFileSync(filePath, { encoding: 'utf8', flag: 'r' }));
   }
 }
 
