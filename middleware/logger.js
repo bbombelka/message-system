@@ -8,8 +8,8 @@ class Logger {
     };
   }
   determineAvailableServices = () => {
-    fs.readdir(path.join(__dirname.replace('middleware', ''), 'services'), (err, dirContent) => {
-      if (err) return new Error(err);
+    fs.readdir(path.join(__dirname, '..', 'services'), (err, dirContent) => {
+      if (err) throw err;
       const actualAvailableServices = dirContent.filter(item => !/\./.test(item));
       this.state.availableServices = [...actualAvailableServices];
     });
@@ -27,11 +27,7 @@ class Logger {
     next();
   };
   setState = (request, response) => {
-    const folderPath = path.join(
-      __dirname.replace('middleware', ''),
-      'logs',
-      helper.getDate().slice(0, 10),
-    );
+    const folderPath = path.join(__dirname, '..', 'logs', helper.getDate().slice(0, 10));
 
     this.state = {
       ...this.state,
@@ -54,4 +50,4 @@ class Logger {
   };
 }
 
-module.exports = new Logger();
+module.exports = new Logger(); //needs to be rearranged
