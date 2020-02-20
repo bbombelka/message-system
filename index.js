@@ -6,7 +6,6 @@ const rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service
 const logger = require('./middleware/logger');
 const helper = require('./server-helper');
 const conditional = require('express-conditional-middleware');
-const config = require('./config');
 
 server.use(express.urlencoded());
 server.use(express.json());

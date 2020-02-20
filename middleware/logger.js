@@ -1,11 +1,13 @@
 const path = require('path');
 const fs = require('fs');
 const helper = require('./logger-helper');
+
 class Logger {
   constructor() {
     this.state = {
       availableServices: this.determineAvailableServices(),
     };
+    this.checkForOutdatedLogs();
   }
   determineAvailableServices = () => {
     fs.readdir(path.join(__dirname, '..', 'services'), (err, dirContent) => {
@@ -16,7 +18,6 @@ class Logger {
   };
   log = (request, response, next) => {
     this.setState(request, response);
-
     const { folderPath, serviceName, availableServices } = this.state;
 
     fs.mkdir(folderPath, () => {
@@ -47,6 +48,33 @@ class Logger {
       helper.formatLog(logFileData),
       err => new Error(err),
     );
+  };
+
+  checkForOutdatedLogs = () => {
+    const logsPath = path.join(__dirname, '..', 'logs');
+    const logsToRemove = [];
+
+    fs.readdir(logsPath, (err, dirContent) => {
+      if (err) throw err;
+      dirContent.forEach((dir, index) => {
+        const { birthtimeMs } = fs.lstatSync(path.join(logsPath, dir));
+        helper.logIsBeyondStorageTime(birthtimeMs) && logsToRemove.push(dir);
+        index === dirContent.length - 1 && logsToRemove.length && this.deleteLogs(logsToRemove);
+      });
+    });
+  };
+  deleteLogs = logs => {
+    const logsPath = path.join(__dirname, '..', 'logs');
+
+    logs.forEach(logFolder => {
+      fs.rmdir(
+        path.join(logsPath, logFolder),
+        { maxRetries: this.state.availableServices.length, recursive: true },
+        err => {
+          if (err) throw err;
+        },
+      );
+    });
   };
 }
 

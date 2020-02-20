@@ -4,6 +4,7 @@ const path = require('path');
 
 class RengetthrsHelper {
   static processRequest(params) {
+    const dbData = this.getDbData();
     const numberOfThreadsOnServer = threadsDatabase.length;
     const numberOfThreadsToSend = params.numrec;
     const numberOfThreadsToIgnore = params.skip;
@@ -13,14 +14,17 @@ class RengetthrsHelper {
     ) {
       return 'Parameter is not correct';
     }
-    const threadsPayload = this.selectPayload(numberOfThreadsToSend, numberOfThreadsToIgnore);
+    const threadsPayload = this.selectPayload({
+      numberOfThreadsToSend,
+      numberOfThreadsToIgnore,
+      threadDb: dbData,
+    });
     return { threads: threadsPayload, total: numberOfThreadsOnServer };
   }
 
-  static selectPayload(numberOfThreadsToSend, numberOfThreadsToIgnore) {
+  static selectPayload({ numberOfThreadsToSend, numberOfThreadsToIgnore, threadDb }) {
     const startIndex = parseInt(numberOfThreadsToIgnore);
     const endIndex = startIndex + parseInt(numberOfThreadsToSend);
-    const threadDb = RengetthrsHelper.getDbData();
 
     return threadDb.slice(startIndex, endIndex);
   }
