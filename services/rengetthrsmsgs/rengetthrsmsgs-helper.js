@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const serviceEventEmitter = require('../event-emitter');
 
 class RengetthrsmsgsHelper {
   static processRequest({ ref, numrec, skip }) {
@@ -20,7 +21,7 @@ class RengetthrsmsgsHelper {
       numberOfMessagesToIgnore,
     );
     const messagesToSend = this.selectMessagesToSend(parentThreadMessages, selectParams);
-    this.markAsRead(this.selectMessagesToSend(parentThreadMessages, selectParams));
+    this.markAsRead(ref, this.getSelectedMessagesRefs(messagesToSend));
     return {
       messages: messagesToSend,
       total: numberOfMessagesOnServer,
@@ -43,13 +44,44 @@ class RengetthrsmsgsHelper {
     return messages.filter((_, idx) => idx >= Math.min(...range) && idx < Math.max(...range));
   }
 
-  static markAsRead(messages) {
-    messages.forEach((_, idx, arr) => (arr[idx].read = 'T'));
+  static getSelectedMessagesRefs(messages) {
+    return messages.map(mess => mess.ref);
+  }
+
+  static markAsRead(threadRef, messagesRefs) {
+    const messageDatabase = this.getDbData();
+    const messageObjectIndex = messageDatabase.findIndex(
+      messObj => messObj.ref === threadRef.trim(),
+    );
+    messageDatabase[messageObjectIndex].msgs.forEach(mess =>
+      messagesRefs.includes(mess.ref) ? (mess.read = 'T') : null,
+    );
+
+    const numberOfUnreadMessages = messageDatabase[messageObjectIndex].msgs.filter(
+      messObj => messObj.read === 'N',
+    ).length;
+
+    serviceEventEmitter.emit(
+      'unread:message:number:change',
+      numberOfUnreadMessages,
+      threadRef.trim(),
+    );
+
+    this.saveDbData(messageDatabase);
   }
 
   static getDbData() {
-    const filePath = path.join(__dirname, '..', '..', 'database', 'messages.json');
-    return JSON.parse(fs.readFileSync(filePath, { encoding: 'utf8', flag: 'r' }));
+    return JSON.parse(fs.readFileSync(this.getDbFilePath(), { encoding: 'utf8', flag: 'r' }));
+  }
+
+  static saveDbData(data) {
+    fs.writeFile(this.getDbFilePath(), JSON.stringify(data), err => {
+      if (err) throw err;
+    });
+  }
+
+  static getDbFilePath() {
+    return path.join(__dirname, '..', '..', 'database', 'messages.json');
   }
 }
 

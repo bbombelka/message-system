@@ -1,7 +1,11 @@
 const threadsDatabase = require('../../threads');
 const fs = require('fs');
 const path = require('path');
+const serviceEventEmitter = require('../event-emitter');
 
+serviceEventEmitter.on('unread:message:number:change', (num, threadRef) => {
+  RengetthrsHelper.adjustUnreadMessagesNumberInThread(num, threadRef);
+});
 class RengetthrsHelper {
   static processRequest(params) {
     const dbData = this.getDbData();
@@ -30,8 +34,28 @@ class RengetthrsHelper {
   }
 
   static getDbData() {
-    const filePath = path.join(__dirname, '..', '..', 'database', 'threads.json');
-    return JSON.parse(fs.readFileSync(filePath, { encoding: 'utf8', flag: 'r' }));
+    return JSON.parse(fs.readFileSync(this.getDbFilePath(), { encoding: 'utf8', flag: 'r' }));
+  }
+
+  static saveDbData(data) {
+    fs.writeFile(this.getDbFilePath(), JSON.stringify(data), err => {
+      if (err) throw err;
+    });
+  }
+
+  static getDbFilePath() {
+    return path.join(__dirname, '..', '..', 'database', 'threads.json');
+  }
+
+  static adjustUnreadMessagesNumberInThread(unreadMessagesNumber, threadRef) {
+    const threadsDatabase = this.getDbData();
+    const selectedThread = threadsDatabase.filter(thread => thread.ref === threadRef)[0];
+    selectedThread.unreadmess = unreadMessagesNumber;
+
+    if (!unreadMessagesNumber) {
+      selectedThread.read = 'T';
+    }
+    this.saveDbData(threadsDatabase);
   }
 }
 
