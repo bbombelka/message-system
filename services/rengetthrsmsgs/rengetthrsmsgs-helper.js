@@ -1,6 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const serviceEventEmitter = require('../event-emitter');
+const ServiceHelper = require('../service-helper');
 
 class RengetthrsmsgsHelper {
   static processRequest({ ref, numrec, skip }) {
@@ -36,7 +35,7 @@ class RengetthrsmsgsHelper {
   }
 
   static getMessagesFromParentThread(threadRef) {
-    const messageDatabase = this.getDbData();
+    const messageDatabase = ServiceHelper.getDbData('messages');
     return messageDatabase.filter(message => message.ref === threadRef)[0]['msgs'];
   }
 
@@ -49,7 +48,7 @@ class RengetthrsmsgsHelper {
   }
 
   static markAsRead(threadRef, messagesRefs) {
-    const messageDatabase = this.getDbData();
+    const messageDatabase = ServiceHelper.getDbData('messages');
     const messageObjectIndex = messageDatabase.findIndex(
       messObj => messObj.ref === threadRef.trim(),
     );
@@ -67,21 +66,7 @@ class RengetthrsmsgsHelper {
       threadRef.trim(),
     );
 
-    this.saveDbData(messageDatabase);
-  }
-
-  static getDbData() {
-    return JSON.parse(fs.readFileSync(this.getDbFilePath(), { encoding: 'utf8', flag: 'r' }));
-  }
-
-  static saveDbData(data) {
-    fs.writeFile(this.getDbFilePath(), JSON.stringify(data), err => {
-      if (err) throw err;
-    });
-  }
-
-  static getDbFilePath() {
-    return path.join(__dirname, '..', '..', 'database', 'messages.json');
+    ServiceHelper.saveDbData(messageDatabase, 'messages');
   }
 }
 

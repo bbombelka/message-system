@@ -3,6 +3,7 @@ const server = express();
 const PORT = 8000;
 const rengetthrs = require('./services/rengetthrs/rengetthrs-service');
 const rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service');
+const deleteitem = require('./services/deleteitem/deleteitem-service');
 const logger = require('./middleware/logger');
 const helper = require('./server-helper');
 const conditional = require('express-conditional-middleware');
@@ -18,6 +19,7 @@ server.use((req, res, next) => {
 });
 server.post('/rengetthrs', rengetthrs.rengetthrsService);
 server.post('/rengetthrsmsgs', rengetthrsmsgs.service);
+server.post('/deleteitem', deleteitem.deleteItemService);
 
 server.listen(PORT, () => {
   helper.onServerStart();

@@ -1,15 +1,17 @@
-const threadsDatabase = require('../../threads');
-const fs = require('fs');
-const path = require('path');
+const ServiceHelper = require('../service-helper');
 const serviceEventEmitter = require('../event-emitter');
 
 serviceEventEmitter.on('unread:message:number:change', (num, threadRef) => {
   RengetthrsHelper.adjustUnreadMessagesNumberInThread(num, threadRef);
 });
+
+serviceEventEmitter.on('total:message:number:change', (num, threadRef) => {
+  RengetthrsHelper.adjustTotalMessageNumberInThread(num, threadRef);
+});
 class RengetthrsHelper {
   static processRequest(params) {
-    const dbData = this.getDbData();
-    const numberOfThreadsOnServer = threadsDatabase.length;
+    const dbData = ServiceHelper.getDbData('threads');
+    const numberOfThreadsOnServer = dbData.length;
     const numberOfThreadsToSend = params.numrec;
     const numberOfThreadsToIgnore = params.skip;
     if (
@@ -33,29 +35,22 @@ class RengetthrsHelper {
     return threadDb.slice(startIndex, endIndex);
   }
 
-  static getDbData() {
-    return JSON.parse(fs.readFileSync(this.getDbFilePath(), { encoding: 'utf8', flag: 'r' }));
-  }
-
-  static saveDbData(data) {
-    fs.writeFile(this.getDbFilePath(), JSON.stringify(data), err => {
-      if (err) throw err;
-    });
-  }
-
-  static getDbFilePath() {
-    return path.join(__dirname, '..', '..', 'database', 'threads.json');
-  }
-
   static adjustUnreadMessagesNumberInThread(unreadMessagesNumber, threadRef) {
-    const threadsDatabase = this.getDbData();
-    const selectedThread = threadsDatabase.filter(thread => thread.ref === threadRef)[0];
-    selectedThread.unreadmess = unreadMessagesNumber;
+    const threadsDatabase = ServiceHelper.getDbData('threads');
+    const thread = threadsDatabase.filter(thread => thread.ref === threadRef)[0];
+    thread.unreadmess = unreadMessagesNumber;
 
     if (!unreadMessagesNumber) {
-      selectedThread.read = 'T';
+      thread.read = 'T';
     }
-    this.saveDbData(threadsDatabase);
+    ServiceHelper.saveDbData(threadsDatabase, 'threads');
+  }
+
+  static adjustTotalMessageNumberInThread(num, threadRef) {
+    const threadsDatabase = ServiceHelper.getDbData('threads');
+    const thread = threadsDatabase.filter(thread => thread.ref === threadRef)[0];
+    thread.nummess = num;
+    ServiceHelper.saveDbData(threadsDatabase, 'threads');
   }
 }
 
