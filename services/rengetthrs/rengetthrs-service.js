@@ -12,7 +12,7 @@ module.exports = {
     } else response.status(500);
 
     if (typeof responseBody === 'string') {
-      response.status(500).send(responseBody);
+      response.status(500).json(ServiceHelper.formatErrorResponse(responseBody));
     }
 
     responseBody = ServiceHelper.formatResponse(responseBody);

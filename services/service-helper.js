@@ -5,6 +5,10 @@ class ServiceHelper {
     return { status: 'OK', data };
   }
 
+  static formatErrorResponse(msg) {
+    return { status: 'ERROR', msg };
+  }
+
   static getDbFilePath(dbType) {
     return path.join(__dirname, '..', 'database', `${dbType}.json`);
   }

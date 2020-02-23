@@ -13,10 +13,6 @@ class DeleteItemHelper {
     }
   }
 
-  static handleIncorrectRef() {
-    return 'Invalid ref';
-  }
-
   static deleteThread(ref, options) {
     const threadsDb = ServiceHelper.getDbData('threads');
     const threadIndex = threadsDb.findIndex(thread => thread.ref === ref);
@@ -39,6 +35,30 @@ class DeleteItemHelper {
 
   static deleteMessage(ref) {
     const messageDb = ServiceHelper.getDbData('messages');
+    const indexes = this.getThreadAndMessageIndexes(ref, messageDb);
+
+    if (!Object.keys(indexes).length) {
+      return this.handleIncorrectRef();
+    }
+
+    messageDb[indexes.thread].msgs.splice(indexes.message, 1);
+    const numOfMess = messageDb[indexes.thread].msgs.length;
+
+    if (!numOfMess) {
+      return this.handleDeletionOfLastMessage(messageDb, indexes.thread);
+    }
+
+    messageDb[indexes.thread].tot = numOfMess;
+    ServiceHelper.saveDbData(messageDb, 'messages');
+    serviceEventEmitter.emit(
+      'total:message:number:change',
+      numOfMess,
+      messageDb[indexes.thread].ref,
+    );
+    return { msgTot: numOfMess, ref };
+  }
+
+  static getThreadAndMessageIndexes(ref, messageDb) {
     const indexes = {};
 
     for (let i = 0; i < messageDb.length; i++) {
@@ -49,28 +69,18 @@ class DeleteItemHelper {
         break;
       }
     }
+    return indexes;
+  }
 
-    if (!Object.keys(indexes).length) {
-      return this.handleIncorrectRef();
-    }
-
-    messageDb[indexes.thread].msgs.splice(indexes.message, 1);
-    const numOfMess = messageDb[indexes.thread].msgs.length;
-
-    if (!numOfMess) {
-      const threadRef = messageDb[indexes.thread].ref;
-      messageDb.splice(indexes.thread, 1);
-      ServiceHelper.saveDbData(messageDb, 'messages');
-      return this.deleteThread(threadRef, { messagesWereDeleted: true });
-    }
-    messageDb[indexes.thread].tot = numOfMess;
+  static handleDeletionOfLastMessage(messageDb, threadId) {
+    const threadRef = messageDb[threadId].ref;
+    messageDb.splice(threadId, 1);
     ServiceHelper.saveDbData(messageDb, 'messages');
-    serviceEventEmitter.emit(
-      'total:message:number:change',
-      messageDb[indexes.thread].tot,
-      messageDb[indexes.thread].ref,
-    );
-    return { msgTot: messageDb[indexes.thread].tot, ref };
+    return this.deleteThread(threadRef, { messagesWereDeleted: true });
+  }
+
+  static handleIncorrectRef() {
+    return 'Invalid ref';
   }
 }
 
