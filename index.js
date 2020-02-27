@@ -4,6 +4,7 @@ const PORT = 8000;
 const rengetthrs = require('./services/rengetthrs/rengetthrs-service');
 const rengetthrsmsgs = require('./services/rengetthrsmsgs/rengetthrsmsgs-service');
 const deleteitem = require('./services/deleteitem/deleteitem-service');
+const createmessage = require('./services/createmessage/createmessage-service');
 const logger = require('./middleware/logger');
 const helper = require('./server-helper');
 const conditional = require('express-conditional-middleware');
@@ -20,6 +21,7 @@ server.use((req, res, next) => {
 server.post('/rengetthrs', rengetthrs.rengetthrsService);
 server.post('/rengetthrsmsgs', rengetthrsmsgs.service);
 server.post('/deleteitem', deleteitem.deleteItemService);
+server.post('/createmessage', createmessage.service);
 
 server.listen(PORT, () => {
   helper.onServerStart();

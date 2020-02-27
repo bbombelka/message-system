@@ -1,18 +1,11 @@
 const DateEnum = require('../enums/date');
 const config = require('../config');
+const DateHelper = require('../helpers/date-helper');
 class LoggerHelper {
   static formatLog(log) {
-    return '\n' + '*'.repeat(30) + '\n\t' + this.getDate() + '\n' + log;
+    return '\n' + '*'.repeat(30) + '\n\t' + DateHelper.getDate() + '\n' + log;
   }
-  static getDate() {
-    return this.formatDate(new Date());
-  }
-  static formatDate(date) {
-    return date
-      .toISOString()
-      .replace(/T|Z/g, ' ')
-      .trim();
-  }
+
   static getLogFileData({ body, headers, method }, { statusCode }) {
     return `
     REQUEST:

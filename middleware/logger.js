@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const helper = require('./logger-helper');
+const ServiceHelper = require('../helpers/date-helper');
 
 class Logger {
   constructor() {
@@ -28,7 +29,7 @@ class Logger {
     next();
   };
   setState = (request, response) => {
-    const folderPath = path.join(__dirname, '..', 'logs', helper.getDate().slice(0, 10));
+    const folderPath = path.join(__dirname, '..', 'logs', ServiceHelper.getDate().slice(0, 10));
 
     this.state = {
       ...this.state,
