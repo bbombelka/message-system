@@ -3,6 +3,7 @@ const ServiceHelper = require('../service-helper');
 
 module.exports = {
   rengetthrsService: (request, response) => {
+    console.log(request.body);
     const { body } = request;
     const bodyHasContent = Object.keys(body).length > 0;
     let responseBody;
