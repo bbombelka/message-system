@@ -1,24 +1,16 @@
+const Service = require('../../common/service');
 const SendInEmailHelper = require('./sendinemail-helper');
 const ServiceHelper = require('../service-helper');
-const nodemailer = require('nodemailer');
 const ServiceEmitter = require('../event-emitter');
+const nodemailer = require('nodemailer');
+const path = require('path');
 
-class SendInEmail {
-  constructor() {
-    this.state = {
-      error: false,
-    };
+class NewSendInEmail extends Service {
+  constructor(serviceEmitter, { prefix }) {
+    super(serviceEmitter);
+    this.setState('options', { ...this.state.options, prefix });
+    this.attachListeners();
   }
-  service = (request, response) => {
-    const { body } = request;
-    const bodyHasContent = Object.keys(body).length > 0;
-    this.state = {};
-    this.state = { ...this.state, ...body, request, response };
-
-    if (bodyHasContent) {
-      this.processRequest();
-    } else response.status(500);
-  };
 
   processRequest = () => {
     this.checkRef();
@@ -28,18 +20,17 @@ class SendInEmail {
       const content = this.getEmailContent();
       this.sendEmail(content);
     } else {
-      this.state = { ...this.state, responseBody: 'Invalid reference', error: true };
-      ServiceEmitter.emit('processing-finished');
+      this.finishProcessWithError('Invalid reference.');
     }
   };
 
   checkRef = () => {
-    const { ref } = this.state;
+    const { ref } = this.state.requestBody;
     const messagesDb = ServiceHelper.getDbData('messages');
     const filteredMessageObj = messagesDb.filter(messObj => messObj.ref === ref);
     filteredMessageObj.length > 0
-      ? (this.state = { ...this.state, refIsValid: true, filteredMessageObj })
-      : (this.state = { ...this.state, refIsValid: false });
+      ? this.setState({ refIsValid: true, filteredMessageObj })
+      : this.setState('refIsValid', false);
   };
 
   getEmailContent = () => {
@@ -53,13 +44,12 @@ class SendInEmail {
         host: 'smtp.ethereal.email',
         port: 587,
         auth: {
-          user: 'tomas.crist@ethereal.email',
-          pass: 'vdW4j9ZafShmeNydJr',
+          user: 'hollis8@ethereal.email',
+          pass: 'qqkPyKVV8VhbS5n94V',
         },
       });
-
       const emailOptions = await transporter.sendMail({
-        from: 'tomas.crist@ethereal.email',
+        from: 'hollis8@ethereal.email',
         to: 'bardelik@o2.pl',
         subject: 'Wiadomości z wątku',
         html: content,
@@ -77,21 +67,13 @@ class SendInEmail {
 
   prepareResponse = responseInfo => {
     const url = nodemailer.getTestMessageUrl(responseInfo);
-    const responseBody = { url };
-    this.state = { ...this.state, responseBody };
-    ServiceEmitter.emit('processing-finished');
-  };
-
-  respond = () => {
-    const { responseBody, response, error } = this.state;
-    error
-      ? response.status(404).json(ServiceHelper.formatErrorResponse(responseBody))
-      : response.json(ServiceHelper.formatResponse(responseBody));
+    this.setState('responseBody', { url });
+    this.emitEvent('processing-finished');
   };
 }
 
-const sendInEmailService = new SendInEmail();
+const options = {
+  prefix: path.basename(__filename, '.js'),
+};
 
-module.exports = sendInEmailService;
-
-ServiceEmitter.on('processing-finished', sendInEmailService.respond);
+module.exports = new NewSendInEmail(ServiceEmitter, options);
