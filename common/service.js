@@ -62,7 +62,7 @@ class Service {
   validateRequestHasBody = () => {
     const { body } = this.state.request;
     Object.keys(body).length === 0
-      ? this.finishProcessWithError('Resource not found.')
+      ? this.finishProcessWithError('No request data found.', 400)
       : this.setState('requestBody', body);
   };
 

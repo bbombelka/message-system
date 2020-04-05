@@ -5,7 +5,14 @@ const PORT = 8000;
 const logger = require('./middleware/logger');
 const helper = require('./server-helper');
 const conditional = require('express-conditional-middleware');
+const fileUpload = require('express-fileupload');
 
+server.use(
+  fileUpload({
+    createParentPath: true,
+    debug: false,
+  }),
+);
 server.use(express.urlencoded());
 server.use(express.json());
 server.use(conditional(process.argv.includes('logger'), logger.log, null));
