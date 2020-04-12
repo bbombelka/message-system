@@ -21,17 +21,15 @@ class UploadAttachment extends Service {
 
   performValidation = () => {
     const validations = [
-      this.validateRequestHasBody,
-      this.validateRequestHasFiles,
-      this.validateMessageRef,
-      this.validateRequestFileContent,
+      'validateRequestHasBody',
+      'validateRequestHasFiles',
+      'validateMessageRef',
+      'validateRequestFileContent',
     ];
 
     for (const validation of validations) {
-      validation();
-      if (this.state.error) {
-        break;
-      }
+      this[validation]();
+      if (this.state.error) break;
     }
   };
 
@@ -50,11 +48,9 @@ class UploadAttachment extends Service {
     const messageDb = ServiceHelper.getDbData('messages');
     const messObj = messageDb.filter(messObj => messObj.msgs.find(msg => msg.ref === ref))[0];
 
-    if (messObj) {
-      this.setState({ messObj, messageDb });
-    } else {
-      this.finishProcessWithError('Invalid reference.');
-    }
+    messObj
+      ? this.setState({ messObj, messageDb })
+      : this.finishProcessWithError('Invalid reference.');
   };
 
   validateRequestFileContent = () => {
@@ -74,21 +70,15 @@ class UploadAttachment extends Service {
       if (size > uploadEnum.MAXIMUM_FILE_SIZE) {
         const error = `${name} is too big. Maximum size is ${uploadEnum.MAXIMUM_FILE_SIZE} bytes per file.`;
         filesToRemoveIndexes.push(index);
-        UploadattachmentHelper.updateResponseObject(
-          responseObject,
-          uploadEnum.ERROR_RESPONSE,
-          error,
-        );
+        const options = { status: uploadEnum.ERROR_RESPONSE, msg: error };
+        UploadattachmentHelper.updateResponseObject(responseObject, options);
       }
 
       if (!uploadEnum.ACCEPTED_FILE_TYPES.includes(mimetype)) {
         const error = `${name} has unsupported extension.`;
         filesToRemoveIndexes.push(index);
-        UploadattachmentHelper.updateResponseObject(
-          responseObject,
-          uploadEnum.ERROR_RESPONSE,
-          error,
-        );
+        const options = { status: uploadEnum.ERROR_RESPONSE, msg: error };
+        UploadattachmentHelper.updateResponseObject(responseObject, options);
       }
       responseInfo.push(responseObject);
     });
@@ -109,9 +99,12 @@ class UploadAttachment extends Service {
 
   processRequest = async () => {
     await this.writeFilesToDisk();
-    this.updateAttachmentDatabase();
-    this.updateMessageDatabase();
+    if (this.state.attachments) {
+      this.updateAttachmentDatabase();
+      this.updateMessageDatabase();
+    }
     this.prepareResponseMessage();
+    this.verifyErrorState();
     this.emitEvent('processing-finished');
   };
 
@@ -126,11 +119,8 @@ class UploadAttachment extends Service {
       } catch (error) {
         const errorMessage = 'There were problems with saving the file.';
         const responseObject = responseInfo.find(response => response.md5 === file.md5);
-        UploadattachmentHelper.updateResponseObject(
-          responseObject,
-          uploadEnum.ERROR_RESPONSE,
-          errorMessage,
-        );
+        const options = { status: uploadEnum.ERROR_RESPONSE, msg: errorMessage };
+        UploadattachmentHelper.updateResponseObject(responseObject, options);
       }
     }
     this.setState({ responseInfo });
@@ -181,6 +171,14 @@ class UploadAttachment extends Service {
     });
 
     this.setState({ responseBody });
+  };
+
+  verifyErrorState = () => {
+    const { responseBody } = this.state;
+    const allFilesAreErroneus = responseBody.every(
+      responseInfo => responseInfo.status === uploadEnum.ERROR_RESPONSE,
+    );
+    if (allFilesAreErroneus) this.setState({ error: true, statusCode: 400 });
   };
 }
 

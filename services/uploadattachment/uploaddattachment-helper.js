@@ -5,7 +5,7 @@ class UploadattachmentHelper {
     return { md5, status: uploadEnum.SUCCESSFUL_RESPONSE, name, msg: [] };
   }
 
-  static updateResponseObject(responseObj, status, msg) {
+  static updateResponseObject(responseObj, { status, msg }) {
     responseObj.status = status;
     responseObj.msg.push(msg);
   }

@@ -51,7 +51,7 @@ class Service {
     } else if (typeof prop === 'string' && value !== undefined) {
       const propToSet = Object.defineProperty({}, prop, { value, enumerable: true });
       this.state = { ...this.state, ...propToSet };
-    } else throw Error('Invalid argument(s). Use either key-value pair or provide object.');
+    } else throw Error('Invalid argument(s). Use either key-value pair or provide an object.');
   };
 
   resetState = () => {
