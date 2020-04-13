@@ -11,6 +11,7 @@ class Service {
           ['-processing-finished', () => this.sendResponse()],
           ['-processing-started', () => this.processRequest()],
         ],
+        validationList: ['validateRequestHasBody'],
       },
     });
   }
@@ -25,8 +26,21 @@ class Service {
   service = (request, response, next) => {
     this.resetState();
     this.setState({ request, response, next });
-    this.validateRequestHasBody();
+    this.performValidation();
     this.checkValidationStatus();
+  };
+
+  performValidation = () => {
+    const { validationList } = this.state.options;
+    for (const validation of validationList) {
+      this[validation]();
+      if (this.state.error) break;
+    }
+  };
+
+  setValidation = validationList => {
+    const validations = Array.isArray(validationList) ? validationList : [validationList];
+    this.state.options.validationList.push(...validations);
   };
 
   checkValidationStatus = () => {

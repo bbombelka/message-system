@@ -5,37 +5,26 @@ const ServiceEmitter = require('../event-emitter');
 const path = require('path');
 const uploadEnum = require('../../enums/upload');
 
+const options = {
+  prefix: path.basename(__filename, '.js'),
+};
 class UploadAttachment extends Service {
   constructor(serviceEmitter, { prefix }) {
     super(serviceEmitter);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
-  }
-
-  service = (request, response) => {
-    this.resetState();
-    this.setState({ request, response });
-    this.performValidation();
-    this.checkValidationStatus();
-  };
-
-  performValidation = () => {
-    const validations = [
-      'validateRequestHasBody',
+    this.setValidation([
       'validateRequestHasFiles',
       'validateMessageRef',
       'validateRequestFileContent',
-    ];
-
-    for (const validation of validations) {
-      this[validation]();
-      if (this.state.error) break;
-    }
-  };
+    ]);
+  }
 
   validateRequestHasFiles = () => {
     const { request } = this.state;
-    request.files ? null : this.finishProcessWithError('No file attached to the request.', 400);
+    if (!request.files) {
+      this.finishProcessWithError('No file attached to the request.', 400);
+    }
   };
 
   validateMessageRef = () => {
@@ -181,9 +170,5 @@ class UploadAttachment extends Service {
     if (allFilesAreErroneus) this.setState({ error: true, statusCode: 400 });
   };
 }
-
-const options = {
-  prefix: path.basename(__filename, '.js'),
-};
 
 module.exports = new UploadAttachment(ServiceEmitter, options);

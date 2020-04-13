@@ -5,32 +5,33 @@ const ServiceEmitter = require('../event-emitter');
 const nodemailer = require('nodemailer');
 const path = require('path');
 
+const options = {
+  prefix: path.basename(__filename, '.js'),
+};
+
 class NewSendInEmail extends Service {
   constructor(serviceEmitter, { prefix }) {
     super(serviceEmitter);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
+    this.setValidation('checkRef');
   }
 
   processRequest = () => {
-    this.checkRef();
-    const { refIsValid } = this.state;
-
-    if (refIsValid) {
-      const content = this.getEmailContent();
-      this.sendEmail(content);
-    } else {
-      this.finishProcessWithError('Invalid reference.');
-    }
+    const content = this.getEmailContent();
+    this.sendEmail(content);
   };
 
   checkRef = () => {
     const { ref } = this.state.requestBody;
+    if (ref.length !== 44) {
+      this.finishProcessWithError('Invalid reference format.', 400);
+    }
     const messagesDb = ServiceHelper.getDbData('messages');
     const filteredMessageObj = messagesDb.filter(messObj => messObj.ref === ref);
     filteredMessageObj.length > 0
-      ? this.setState({ refIsValid: true, filteredMessageObj })
-      : this.setState('refIsValid', false);
+      ? this.setState({ filteredMessageObj })
+      : this.finishProcessWithError('Invalid reference', 400);
   };
 
   getEmailContent = () => {
@@ -61,7 +62,7 @@ class NewSendInEmail extends Service {
         this.prepareResponse(responseInfo);
       });
     } catch (error) {
-      throw error;
+      this.finishProcessWithError(error);
     }
   };
 
@@ -71,9 +72,5 @@ class NewSendInEmail extends Service {
     this.emitEvent('processing-finished');
   };
 }
-
-const options = {
-  prefix: path.basename(__filename, '.js'),
-};
 
 module.exports = new NewSendInEmail(ServiceEmitter, options);
