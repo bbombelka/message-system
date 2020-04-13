@@ -56,7 +56,7 @@ class Service {
 
   processRequest = () => {
     const { response } = this.state;
-    response.end();
+    response.send('Service is mounted');
   };
 
   setState = (prop, value) => {
