@@ -1,23 +1,30 @@
 const Service = require('../../common/service');
-const ServiceHelper = require('../service-helper');
 const ServiceEmitter = require('../event-emitter');
 const path = require('path');
+const DatabaseController = require('../../database-controller');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 
 class GetThreads extends Service {
-  constructor(serviceEmitter, { prefix }) {
-    super(serviceEmitter);
+  constructor(serviceEmitter, databaseController, { prefix }) {
+    super(serviceEmitter, databaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
-    this.setValidation(['prepareParameters', 'setDatabase', 'checkParameters']);
+    this.setValidation('prepareParameters');
   }
 
-  processRequest = () => {
-    this.selectThreadsToSend();
-    this.emitEvent('processing-finished');
+  processRequest = async () => {
+    try {
+      await this.getTotalThreadsNumber();
+      if (!this.state.error) {
+        await this.selectThreadsToSend();
+      }
+      this.emitEvent('processing-finished');
+    } catch (error) {
+      this.finishProcessWithError('There has been a server error', 400);
+    }
   };
 
   prepareParameters = () => {
@@ -38,29 +45,29 @@ class GetThreads extends Service {
     });
   };
 
-  checkParameters = () => {
-    const { numberOfThreadsToIgnore, numberOfThreadsOnServer } = this.state;
+  getTotalThreadsNumber = async () => {
+    const numberOfThreadsOnServer = await this.databaseController.getThreadNumber();
+    const { numberOfThreadsToIgnore } = this.state;
+
     if (numberOfThreadsToIgnore > numberOfThreadsOnServer) {
-      this.finishProcessWithError(
+      return this.finishProcessWithError(
         'Number of threads to skip is greater than total number of threads.',
         400,
       );
     }
+
+    this.setState({ numberOfThreadsOnServer });
   };
 
-  selectThreadsToSend = () => {
-    const { numberOfThreadsToIgnore, numberOfThreadsToSend, threadDb } = this.state;
-    const startIndex = parseInt(numberOfThreadsToIgnore);
-    const endIndex = startIndex + parseInt(numberOfThreadsToSend);
-    const threadsToSend = threadDb.slice(startIndex, endIndex);
-    this.setState('responseBody', { threads: threadsToSend, total: threadDb.length });
-  };
+  selectThreadsToSend = async () => {
+    const { numberOfThreadsToSend, numberOfThreadsToIgnore, numberOfThreadsOnServer } = this.state;
 
-  setDatabase = () => {
-    const threadDb = ServiceHelper.getDbData('threads');
-    const numberOfThreadsOnServer = threadDb.length;
-    this.setState({ threadDb, numberOfThreadsOnServer });
+    const threads = await this.databaseController.getThreads(
+      parseInt(numberOfThreadsToSend),
+      parseInt(numberOfThreadsToIgnore),
+    );
+    this.setState('responseBody', { threads, total: numberOfThreadsOnServer });
   };
 }
 
-module.exports = new GetThreads(ServiceEmitter, options);
+module.exports = new GetThreads(ServiceEmitter, DatabaseController, options);

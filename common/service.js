@@ -2,8 +2,9 @@ const isNull = require('../utils/isNull');
 const ServiceHelper = require('../services/service-helper');
 
 class Service {
-  constructor(serviceEmitter) {
+  constructor(serviceEmitter, databaseController) {
     this.serviceEmitter = serviceEmitter;
+    this.databaseController = databaseController;
     this.setState({
       options: {
         prefix: 'service',
