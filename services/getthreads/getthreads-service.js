@@ -2,6 +2,8 @@ const Service = require('../../common/service');
 const ServiceEmitter = require('../event-emitter');
 const path = require('path');
 const DatabaseController = require('../../database-controller');
+const CipheringHandler = require('../../common/ciphering-handler');
+const ThreadModel = require('../../models/thread-model');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -60,13 +62,26 @@ class GetThreads extends Service {
   };
 
   selectThreadsToSend = async () => {
-    const { numberOfThreadsToSend, numberOfThreadsToIgnore, numberOfThreadsOnServer } = this.state;
+    const { numberOfThreadsToSend, numberOfThreadsToIgnore } = this.state;
 
     const threads = await this.databaseController.getThreads(
       parseInt(numberOfThreadsToSend),
       parseInt(numberOfThreadsToIgnore),
     );
-    this.setState('responseBody', { threads, total: numberOfThreadsOnServer });
+
+    this.encryptThreadId(threads);
+  };
+
+  encryptThreadId = threads => {
+    const { numberOfThreadsOnServer } = this.state;
+    const encryptedIdThreads = threads.map(thread => {
+      return {
+        ...ThreadModel.parse(thread),
+        ref: CipheringHandler.encryptData({ id: thread._id.toString(), type: 'T' }),
+      };
+    });
+
+    this.setState('responseBody', { threads: encryptedIdThreads, total: numberOfThreadsOnServer });
   };
 }
 
