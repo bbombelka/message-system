@@ -2,17 +2,18 @@ const Service = require('../../common/service');
 const ServiceHelper = require('../service-helper');
 const ServiceEmitter = require('../event-emitter');
 const path = require('path');
-
+const DatabaseController = require('../../database-controller');
+const MessageModel = require('../../models/message-model');
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 
 class GetMessages extends Service {
-  constructor(serviceEmitter, { prefix }) {
-    super(serviceEmitter);
+  constructor(serviceEmitter, DatabaseController, { prefix }) {
+    super(serviceEmitter, DatabaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
-    this.setValidation(['checkParameters', 'checkRef', 'checkParameterLogic']);
+    this.setValidation('checkParameters');
   }
 
   checkParameters = () => {
@@ -30,6 +31,9 @@ class GetMessages extends Service {
     if (typeof ref !== 'string' || !ref.length) {
       return this.finishProcessWithError('Reference is missing.', 400);
     }
+    // if (ref.length !== 44) {
+    //   return this.finishProcessWithError('Invalid reference format.', 400);
+    // }
 
     this.setState({
       numberOfMessagesToIgnore,
@@ -38,61 +42,47 @@ class GetMessages extends Service {
     });
   };
 
-  checkRef = () => {
-    const { ref } = this.state;
+  processRequest = async () => {
+    try {
+      this.getParamsForSelectingResponseBodyMessages();
+      await this.selectMessagesToSend();
+      this.emitEvent('processing-finished');
+    } catch (error) {
+      const errorBody =
+        error.type === 'db'
+          ? [error.message, error.statusCode]
+          : ['There has been a server error', 400];
 
-    if (ref.length !== 44) {
-      return this.finishProcessWithError('Invalid reference format.', 400);
+      this.finishProcessWithError(...errorBody);
     }
-    const messageDatabase = ServiceHelper.getDbData('messages');
-    const parentThreadMessages = messageDatabase.filter(message => message.ref === ref);
-    parentThreadMessages.length
-      ? this.setState({
-          requestedThreadMessages: parentThreadMessages[0]['msgs'],
-          numberOfMessagesOnServer: parentThreadMessages[0]['msgs'].length,
-        })
-      : this.finishProcessWithError('Invalid reference.', 400);
-  };
-
-  checkParameterLogic = () => {
-    const { numberOfMessagesToIgnore, numberOfMessagesOnServer } = this.state;
-    if (numberOfMessagesToIgnore > numberOfMessagesOnServer) {
-      this.finishProcessWithError(
-        'Number of messages to skip is greater than total number of messages.',
-        400,
-      );
-    }
-  };
-
-  processRequest = () => {
-    this.getParamsForSelectingResponseBodyMessages();
-    this.selectMessagesToSend();
-    this.prepareResponse();
-    this.emitEvent('processing-finished');
   };
 
   getParamsForSelectingResponseBodyMessages = () => {
     const { numberOfMessagesToSend, numberOfMessagesToIgnore } = this.state;
-    const startIndex = parseInt(numberOfMessagesToIgnore, 10);
-    const endIndex = startIndex + parseInt(numberOfMessagesToSend, 10);
-    this.setState('selectParams', [startIndex, endIndex]);
+    this.setState({
+      limit: parseInt(numberOfMessagesToSend),
+      skip: parseInt(numberOfMessagesToIgnore),
+    });
   };
 
-  selectMessagesToSend = () => {
-    const { requestedThreadMessages, selectParams } = this.state;
-    const messagesToSend = requestedThreadMessages.filter(
-      (_, index) => index >= Math.min(...selectParams) && index < Math.max(...selectParams),
-    );
-    this.setState('requestedThreadMessages', messagesToSend);
+  selectMessagesToSend = async () => {
+    const { limit, skip, ref } = this.state;
+    const messages = await this.databaseController.getMessages(ref, limit, skip);
+
+    this.prepareResponse(messages);
   };
 
-  prepareResponse = () => {
-    const { requestedThreadMessages, numberOfMessagesOnServer } = this.state;
+  prepareResponse = ({ messages, total }) => {
+    const ref = 'encrypted id';
+    const parsedMessages = messages.map(message => {
+      return { ...MessageModel.parse(message), ref };
+    });
+
     this.setState('responseBody', {
-      messages: requestedThreadMessages,
-      total: numberOfMessagesOnServer,
+      messages: parsedMessages,
+      total,
     });
   };
 }
 
-module.exports = new GetMessages(ServiceEmitter, options);
+module.exports = new GetMessages(ServiceEmitter, DatabaseController, options);
