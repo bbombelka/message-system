@@ -6,8 +6,8 @@ class CipheringHandler {
     return {
       algorithm: cipherEnum.ALGORITHM.AES128,
       iv: Buffer.alloc(16, 0),
-      password: 'complex pass',
-      salt: 'salt',
+      password: cipherEnum.PASSWORD,
+      salt: cipherEnum.SALT,
     };
   };
 
@@ -26,6 +26,10 @@ class CipheringHandler {
     return JSON.stringify(dataToEncrypt);
   };
 
+  #prepareDataToUse = data => {
+    return JSON.parse(data);
+  };
+
   encryptData = data => {
     const dataToEncrypt = this.#validateDataToEncrypt(data);
     const { algorithm, iv, password, salt } = this.#getCipheringParameters();
@@ -42,7 +46,7 @@ class CipheringHandler {
 
   decryptData = encryptedData => {
     const { algorithm, iv, password, salt } = this.#getCipheringParameters();
-    const key = crypto.scryptSync(password, salt, 32);
+    const key = crypto.scryptSync(password, salt, 16);
     const decipher = crypto.createDecipheriv(algorithm, key, iv);
     let decryptedData = decipher.update(
       encryptedData,
@@ -50,7 +54,7 @@ class CipheringHandler {
       cipherEnum.ENCODING.UTF8,
     );
     decryptedData += decipher.final(cipherEnum.ENCODING.UTF8);
-    return decryptedData;
+    return this.#prepareDataToUse(decryptedData);
   };
 }
 

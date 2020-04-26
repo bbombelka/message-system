@@ -7,4 +7,6 @@ module.exports = {
   ALGORITHM: {
     AES128: 'aes128',
   },
+  SALT: 'salt',
+  PASSWORD: 'complex pass',
 };
