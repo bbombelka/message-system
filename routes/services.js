@@ -9,7 +9,7 @@ const getmessages = require('../services/getmessages/getmessages-service');
 
 router.post('/getthreads', getthreads.service);
 router.post('/getmessages', getmessages.service);
-router.post('/deleteitem', deleteitem.deleteItemService);
+router.post('/deleteitem', deleteitem.service);
 router.post('/createmessage', createmessage.service);
 router.post('/sendinemail', sendinemail.service);
 router.post('/uploadattachment', uploadattachment.service);

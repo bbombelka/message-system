@@ -68,7 +68,7 @@ class GetMessages extends Service {
   selectMessagesToSend = async () => {
     const { limit, skip, ref } = this.state;
     const { id } = CipheringHandler.decryptData(ref);
-    const messages = await this.databaseController.getMessages(id, limit, skip);
+    const messages = await this.databaseController.getMessages({ id, limit, skip });
 
     this.prepareResponse(messages);
   };
