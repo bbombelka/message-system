@@ -32,6 +32,18 @@ class ServiceHelper {
     }
     return result;
   }
+
+  static itemIsThread(type) {
+    return type === 'T';
+  }
+
+  static isDatabaseError({ type }) {
+    return type === 'db';
+  }
+
+  static messageIsReply(reply) {
+    return reply === 'T';
+  }
 }
 
 module.exports = ServiceHelper;

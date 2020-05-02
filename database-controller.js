@@ -112,6 +112,21 @@ class DatabaseController {
     this.#closeMongoClient();
     return value.thread_id;
   };
+
+  addToCollection = async (item, collectionName) => {
+    await this.#connectMongoClient();
+    const itemCollection = this.#getCollection(collectionName);
+    const { insertedCount, insertedId } = await itemCollection.insertOne(item);
+    if (insertedCount === 0) {
+      this.#throwError('Item has not been persisted to the database.', 500);
+    }
+    if (insertedId !== item._id) {
+      await messagesCollection.deleteOne({ _id: insertedId });
+      this.#throwError('Item has not been persisted to the database.', 500);
+    }
+    this.#closeMongoClient();
+    return insertedId;
+  };
 }
 
 module.exports = new DatabaseController();

@@ -3,7 +3,7 @@ const ServiceEmitter = require('../event-emitter');
 const path = require('path');
 const DatabaseController = require('../../database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
-const Helper = require('./deleteitem-helper');
+const Helper = require('../service-helper');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
