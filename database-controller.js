@@ -109,7 +109,7 @@ class DatabaseController extends EventEmitter {
     return total;
   };
 
-  getMessages = async ({ id, limit, skip }) => {
+  getMessages = async ({ id, limit = 0, skip = 0 }) => {
     await this.#connectMongoClient();
     const cursor = this.client
       .db(databaseConfig.database)

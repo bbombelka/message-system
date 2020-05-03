@@ -1,4 +1,4 @@
-const bool = require('../../enums/boolean');
+const MessageModel = require('../../models/message-model');
 
 class SendInEmailHelper {
   static getEmailBody(messages) {
@@ -15,23 +15,8 @@ class SendInEmailHelper {
     return emailBody;
   }
 
-  static getTextedMessages(messages) {
-    let result = '';
-
-    messages.forEach(({ date, title, txt, read }) => {
-      const messageBody = `
-            Wiadomość z ${date}.
-            ${read === bool.TRUE ? 'Przeczytana' : 'Nieprzeczytana'}
-            Temat: ${title}
-            Treśc wiadomości: 
-            ${txt}
-
-        `;
-      result += messageBody;
-    });
-
-    return result;
-  }
+  static getTextedMessages = messages =>
+    messages.map(message => MessageModel.email(message)).reduce((acc, curr) => acc + curr);
 }
 
 module.exports = SendInEmailHelper;

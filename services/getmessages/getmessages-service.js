@@ -54,13 +54,13 @@ class GetMessages extends Service {
           ? [error.message, error.statusCode]
           : ['There has been a server error', 400];
 
-      this.finishProcessWithError(...errorBody);
-    } finally {
-      const { messages } = this.state;
-      this.emitEvent('processing-finished');
-      if (Helper.payloadHasUnreadMessages(messages)) {
-        this.databaseController.emit('messages-sent', this.getSentMessagesDetails());
-      }
+      return this.finishProcessWithError(...errorBody);
+    }
+
+    const { messages } = this.state;
+    this.emitEvent('processing-finished');
+    if (Helper.payloadHasUnreadMessages(messages)) {
+      this.databaseController.emit('messages-sent', this.getSentMessagesDetails());
     }
   };
 

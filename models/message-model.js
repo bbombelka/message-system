@@ -22,4 +22,12 @@ module.exports = {
       attach: attach || [],
     };
   },
+  email: ({ date, title, text, read }) => `
+      Wiadomość z ${date}.
+      ${read === bool.TRUE ? 'Przeczytana' : 'Nieprzeczytana'}
+      Temat: ${title}
+      Treśc wiadomości: 
+      
+      ${text}
+      `,
 };

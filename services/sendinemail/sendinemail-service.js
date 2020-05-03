@@ -1,6 +1,8 @@
 const Service = require('../../common/service');
 const SendInEmailHelper = require('./sendinemail-helper');
 const ServiceHelper = require('../service-helper');
+const DatabaseController = require('../../database-controller');
+const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceEmitter = require('../event-emitter');
 const nodemailer = require('nodemailer');
 const path = require('path');
@@ -10,36 +12,63 @@ const options = {
 };
 
 class NewSendInEmail extends Service {
-  constructor(serviceEmitter, { prefix }) {
-    super(serviceEmitter);
+  constructor(serviceEmitter, DatabaseController, { prefix }) {
+    super(serviceEmitter, DatabaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
     this.setValidation('checkRef');
   }
 
-  processRequest = () => {
-    const content = this.getEmailContent();
-    this.sendEmail(content);
-  };
-
   checkRef = () => {
-    const { ref } = this.state.requestBody;
-    if (ref.length !== 44) {
-      this.finishProcessWithError('Invalid reference format.', 400);
+    const { ref = undefined } = this.state.requestBody;
+
+    if (!ref) {
+      return this.finishProcessWithError('Reference parameter is missing.', 400);
     }
-    const messagesDb = ServiceHelper.getDbData('messages');
-    const filteredMessageObj = messagesDb.filter(messObj => messObj.ref === ref);
-    filteredMessageObj.length > 0
-      ? this.setState({ filteredMessageObj })
-      : this.finishProcessWithError('Invalid reference', 400);
+
+    if (ref.length !== 64) {
+      return this.finishProcessWithError('Invalid reference format.', 400);
+    }
+
+    this.setState('ref', ref);
   };
 
-  getEmailContent = () => {
-    const { filteredMessageObj } = this.state;
-    return SendInEmailHelper.getEmailBody(filteredMessageObj[0].msgs);
+  processRequest = async () => {
+    try {
+      this.decodeRef();
+      if (!ServiceHelper.itemIsThread(this.state.type)) {
+        return this.finishProcessWithError('Invalid reference', 400);
+      }
+      await this.getThreadMessages();
+      this.createEmailContent();
+      this.sendEmail();
+    } catch (error) {
+      this.finishProcessWithError('There has been a server error.', 500);
+    }
   };
 
-  sendEmail = async content => {
+  decodeRef = () => {
+    const { ref } = this.state;
+    const { id, type } = CipheringHandler.decryptData(ref);
+    this.setState({ id, type });
+  };
+
+  getThreadMessages = async () => {
+    const { id } = this.state;
+    const { messages } = await this.databaseController.getMessages({ id });
+    this.setState({ messages });
+  };
+
+  createEmailContent = () => {
+    const { messages } = this.state;
+    this.setState({
+      emailContent: SendInEmailHelper.getEmailBody(messages),
+    });
+  };
+
+  sendEmail = async () => {
+    const { emailContent } = this.state;
+    console.log(emailContent);
     try {
       const transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
@@ -53,7 +82,7 @@ class NewSendInEmail extends Service {
         from: 'hollis8@ethereal.email',
         to: 'bardelik@o2.pl',
         subject: 'Wiadomości z wątku',
-        html: content,
+        html: emailContent,
       });
 
       transporter.sendMail(emailOptions, async (error, info) => {
@@ -73,4 +102,4 @@ class NewSendInEmail extends Service {
   };
 }
 
-module.exports = new NewSendInEmail(ServiceEmitter, options);
+module.exports = new NewSendInEmail(ServiceEmitter, DatabaseController, options);
