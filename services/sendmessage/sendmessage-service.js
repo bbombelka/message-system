@@ -1,7 +1,7 @@
 const Service = require('../../common/service');
 const ServiceEmitter = require('../event-emitter');
 const path = require('path');
-const DatabaseController = require('../../database-controller');
+const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const { ObjectId } = require('mongodb');
 const messageModel = require('../../models/message-model');

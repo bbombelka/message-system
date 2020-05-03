@@ -1,12 +1,11 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "Messages Server",
+  "description": "Messages System",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "npx nodemon index.js",
-    "noreload": "npx nodemon index.js noreload"
+    "start": "npx nodemon index.js"
   },
   "nodemonConfig": {
     "ignore": [

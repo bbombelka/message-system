@@ -23,11 +23,11 @@ module.exports = {
     };
   },
   email: ({ date, title, text, read }) => `
-      Wiadomość z ${date}.
-      ${read === bool.TRUE ? 'Przeczytana' : 'Nieprzeczytana'}
-      Temat: ${title}
-      Treśc wiadomości: 
+      <strong>Wiadomość z ${date}.</strong><br>
+      <strong>${read === bool.TRUE ? 'Przeczytana' : 'Nieprzeczytana'}</strong><br>
+      <strong>Temat: ${title} </strong><br>
+      <p>Treść wiadomości: 
       
       ${text}
-      `,
+      </p>`,
 };

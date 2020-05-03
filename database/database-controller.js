@@ -1,9 +1,9 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const databaseConfig = require('./database-config.js');
-const DatabaseError = require('./common/database-error');
-const dbError = require('./enums/db-errors');
+const DatabaseError = require('./database-error');
+const dbError = require('../enums/db-errors');
 const EventEmitter = require('events');
-const bool = require('./enums/boolean');
+const bool = require('../enums/boolean');
 
 class DatabaseController extends EventEmitter {
   constructor() {

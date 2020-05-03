@@ -1,7 +1,7 @@
 const Service = require('../../common/service');
 const SendInEmailHelper = require('./sendinemail-helper');
 const ServiceHelper = require('../service-helper');
-const DatabaseController = require('../../database-controller');
+const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceEmitter = require('../event-emitter');
 const nodemailer = require('nodemailer');
@@ -68,7 +68,6 @@ class NewSendInEmail extends Service {
 
   sendEmail = async () => {
     const { emailContent } = this.state;
-    console.log(emailContent);
     try {
       const transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',

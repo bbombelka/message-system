@@ -3,7 +3,6 @@ const server = express();
 const services = require('./routes/services');
 const PORT = 8000;
 const logger = require('./middleware/logger');
-const helper = require('./server-helper');
 const conditional = require('express-conditional-middleware');
 const fileUpload = require('express-fileupload');
 
@@ -25,5 +24,5 @@ server.use((req, res, next) => {
 server.use('/', services);
 
 server.listen(PORT, () => {
-  helper.onServerStart();
+  console.log('SERVER STARTED :-)');
 });
