@@ -7,6 +7,7 @@ const { ObjectId } = require('mongodb');
 const messageModel = require('../../models/message-model');
 const Helper = require('../service-helper');
 const threadModel = require('../../models/thread-model');
+const bool = require('../../enums/boolean');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -31,7 +32,7 @@ class DeleteItem extends Service {
     if (!reply) {
       return this.finishProcessWithError('Reply parameter is missing.', 400);
     }
-    if (reply === 'T') {
+    if (reply === bool.TRUE) {
       if (!ref) {
         return this.finishProcessWithError('Reference parameter is missing.', 400);
       }

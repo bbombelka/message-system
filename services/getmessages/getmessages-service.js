@@ -4,6 +4,8 @@ const path = require('path');
 const DatabaseController = require('../../database-controller');
 const MessageModel = require('../../models/message-model');
 const CipheringHandler = require('../../common/ciphering-handler');
+const Helper = require('./getmessages-helper');
+
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
@@ -46,7 +48,6 @@ class GetMessages extends Service {
     try {
       this.getParamsForSelectingResponseBodyMessages();
       await this.selectMessagesToSend();
-      this.emitEvent('processing-finished');
     } catch (error) {
       const errorBody =
         error.type === 'db'
@@ -54,6 +55,12 @@ class GetMessages extends Service {
           : ['There has been a server error', 400];
 
       this.finishProcessWithError(...errorBody);
+    } finally {
+      const { messages } = this.state;
+      this.emitEvent('processing-finished');
+      if (Helper.payloadHasUnreadMessages(messages)) {
+        this.databaseController.emit('messages-sent', this.getSentMessagesDetails());
+      }
     }
   };
 
@@ -68,12 +75,13 @@ class GetMessages extends Service {
   selectMessagesToSend = async () => {
     const { limit, skip, ref } = this.state;
     const { id } = CipheringHandler.decryptData(ref);
-    const messages = await this.databaseController.getMessages({ id, limit, skip });
-
-    this.prepareResponse(messages);
+    const { messages, total } = await this.databaseController.getMessages({ id, limit, skip });
+    this.setState({ messages, total });
+    this.prepareResponse();
   };
 
-  prepareResponse = ({ messages, total }) => {
+  prepareResponse = () => {
+    const { messages, total } = this.state;
     const encryptedIdMessages = messages.map(message => {
       return {
         ...MessageModel.parse(message),
@@ -85,6 +93,14 @@ class GetMessages extends Service {
       messages: encryptedIdMessages,
       total,
     });
+  };
+
+  getSentMessagesDetails = () => {
+    const { messages } = this.state;
+    return {
+      messagesIds: messages.map(message => message._id),
+      threadId: messages[0].thread_id,
+    };
   };
 }
 

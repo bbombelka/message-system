@@ -1,3 +1,5 @@
+const bool = require('../../enums/boolean');
+
 class SendInEmailHelper {
   static getEmailBody(messages) {
     const emailBody = `
@@ -19,7 +21,7 @@ class SendInEmailHelper {
     messages.forEach(({ date, title, txt, read }) => {
       const messageBody = `
             Wiadomość z ${date}.
-            ${read === 'T' ? 'Przeczytana' : 'Nieprzeczytana'}
+            ${read === bool.TRUE ? 'Przeczytana' : 'Nieprzeczytana'}
             Temat: ${title}
             Treśc wiadomości: 
             ${txt}

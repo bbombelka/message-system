@@ -2,8 +2,21 @@ const { MongoClient, ObjectId } = require('mongodb');
 const databaseConfig = require('./database-config.js');
 const DatabaseError = require('./common/database-error');
 const dbError = require('./enums/db-errors');
+const EventEmitter = require('events');
+const bool = require('./enums/boolean');
 
-class DatabaseController {
+class DatabaseController extends EventEmitter {
+  constructor() {
+    super();
+    this.#attachListeners();
+  }
+
+  #attachListeners = () => {
+    this.on('message-added', threadId => this.#onAddedMessage(threadId));
+    this.on('message-deleted', threadId => this.#onDeletedMessage(threadId));
+    this.on('messages-sent', messagesDetails => this.#onSentMessages(messagesDetails));
+  };
+
   #connectMongoClient = async () => {
     this.client = new MongoClient(databaseConfig.url, { useUnifiedTopology: true });
     await this.client.connect();
@@ -19,6 +32,57 @@ class DatabaseController {
 
   #getCollection = collectionName => {
     return this.client.db(databaseConfig.database).collection(collectionName);
+  };
+
+  #onAddedMessage = async id => {
+    await this.#connectMongoClient();
+    const threads = this.#getCollection('threads');
+    await threads.updateOne({ _id: ObjectId(id) }, { $inc: { nummess: 1 } });
+    this.#closeMongoClient();
+  };
+
+  #onDeletedMessage = async id => {
+    await this.#connectMongoClient();
+    const threads = this.#getCollection('threads');
+    await threads.updateOne({ _id: ObjectId(id) }, { $inc: { nummess: -1 } });
+    this.#closeMongoClient();
+  };
+
+  #onSentMessages = async ({ messagesIds, threadId }) => {
+    await this.#connectMongoClient();
+    const messages = this.#getCollection('messages');
+    const { modifiedCount } = await messages.updateMany(
+      { read: bool.FALSE, _id: { $in: messagesIds } },
+      { $set: { read: bool.TRUE } },
+    );
+    this.#closeMongoClient();
+    this.#changeUnreadCount(modifiedCount, threadId);
+  };
+
+  #changeUnreadCount = async (readMessages, threadId) => {
+    await this.#connectMongoClient();
+    const threads = this.#getCollection('threads');
+
+    const { value, lastErrorObject } = await threads.findOneAndUpdate(
+      { _id: ObjectId(threadId) },
+      { $inc: { unreadmess: -readMessages } },
+      { returnOriginal: false },
+    );
+
+    this.#closeMongoClient();
+    if (value.unreadmess === 0) {
+      this.#markThreadAsRead(threadId);
+    }
+    if (!lastErrorObject.ok) {
+      // perform check if thread data is in sync with messages state
+    }
+  };
+
+  #markThreadAsRead = async threadId => {
+    await this.#connectMongoClient();
+    const threads = this.#getCollection('threads');
+    await threads.updateOne({ _id: ObjectId(threadId) }, { $set: { read: bool.TRUE } });
+    this.#closeMongoClient();
   };
 
   getThreadNumber = async () => {
@@ -110,6 +174,7 @@ class DatabaseController {
       this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
     }
     this.#closeMongoClient();
+    this.emit('message-deleted', value.thread_id);
     return value.thread_id;
   };
 
@@ -125,6 +190,11 @@ class DatabaseController {
       this.#throwError('Item has not been persisted to the database.', 500);
     }
     this.#closeMongoClient();
+
+    if (collectionName === 'messages') {
+      this.emit('message-added', item.thread_id);
+    }
+
     return insertedId;
   };
 }

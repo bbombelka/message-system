@@ -1,9 +1,11 @@
+const bool = require('../enums/boolean');
+
 module.exports = {
-  parse: ({ ref, title, date, txt, read, attachments }) => {
+  parse: ({ ref, title, date, text, read, attachments }) => {
     return {
       ref,
       title,
-      txt,
+      text,
       date,
       read,
       attach: attachments,
@@ -16,7 +18,7 @@ module.exports = {
       title,
       text,
       date: _id.getTimestamp(),
-      read: 'T',
+      read: bool.TRUE,
       attach: attach || [],
     };
   },

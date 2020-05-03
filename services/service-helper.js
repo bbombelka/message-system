@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const bool = require('../enums/boolean');
 class ServiceHelper {
   static formatResponse(data) {
     return { status: 'OK', data };
@@ -42,7 +43,7 @@ class ServiceHelper {
   }
 
   static messageIsReply(reply) {
-    return reply === 'T';
+    return reply === bool.TRUE;
   }
 }
 

@@ -1,3 +1,5 @@
+const bool = require('../enums/boolean');
+
 module.exports = {
   parse: ({ ref, title, cd, date, nummess, unreadmess, type, read }) => {
     return {
@@ -14,13 +16,13 @@ module.exports = {
   database: ({ _id, title, cu, cd }) => {
     return {
       _id,
-      cu: cu || 'T',
-      cd: cd || 'T',
+      cu: cu || bool.TRUE,
+      cd: cd || bool.TRUE,
       date: _id.getTimestamp(),
-      nummess: 1,
+      nummess: 0,
       unreadmess: 0,
       type: 'C',
-      read: 'T',
+      read: bool.TRUE,
       title,
     };
   },
