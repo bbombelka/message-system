@@ -101,6 +101,7 @@ class DeleteItem extends Service {
       thread_id: threadId,
       text,
       title,
+      type: 'O',
     };
 
     return messageModel.database(messageParams);

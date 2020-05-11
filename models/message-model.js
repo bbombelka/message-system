@@ -11,7 +11,7 @@ module.exports = {
       attach: attachments,
     };
   },
-  database: ({ _id, thread_id, title, text, attach }) => {
+  database: ({ _id, thread_id, title, text, attach, type }) => {
     return {
       _id,
       thread_id,
@@ -20,6 +20,8 @@ module.exports = {
       date: _id.getTimestamp(),
       read: bool.TRUE,
       attach: attach || [],
+      type,
+      processed: bool.FALSE,
     };
   },
   email: ({ date, title, text, read }) => `
