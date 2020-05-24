@@ -1,16 +1,20 @@
 const Service = require('../../common/service');
 const ServiceHelper = require('../service-helper');
-const UploadattachmentHelper = require('./uploaddattachment-helper');
+const Helper = require('./uploaddattachment-helper');
 const ServiceEmitter = require('../event-emitter');
 const path = require('path');
 const uploadEnum = require('../../enums/upload');
+const DatabaseController = require('../../database/database-controller');
+const CipheringHandler = require('../../common/ciphering-handler');
+const attachmentModel = require('../../models/attachment-model');
+const { ObjectId, Binary } = require('mongodb');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 class UploadAttachment extends Service {
-  constructor(serviceEmitter, { prefix }) {
-    super(serviceEmitter);
+  constructor(serviceEmitter, databaseController, { prefix }) {
+    super(serviceEmitter, databaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
     this.setValidation([
@@ -28,24 +32,23 @@ class UploadAttachment extends Service {
   };
 
   validateMessageRef = () => {
-    const { ref } = this.state.requestBody;
+    const { ref = undefined } = this.state.requestBody;
+
+    if (!ref) {
+      return this.finishProcessWithError('Reference is missing.', 400);
+    }
 
     if (ref.length !== 64) {
       return this.finishProcessWithError('Invalid reference format.');
     }
 
-    const messageDb = ServiceHelper.getDbData('messages');
-    const messObj = messageDb.filter(messObj => messObj.msgs.find(msg => msg.ref === ref))[0];
-
-    messObj
-      ? this.setState({ messObj, messageDb })
-      : this.finishProcessWithError('Invalid reference.');
+    this.setState({ ref });
   };
 
   validateRequestFileContent = () => {
     const responseInfo = [];
     const filesToRemoveIndexes = [];
-    const { files } = this.state.request.files;
+    const files = this.#getUploadedFiles();
 
     if (files.length > uploadEnum.MAXIMUM_FILE_NUMBER) {
       const error = `Too many files. The maximum is ${uploadEnum.MAXIMUM_FILE_NUMBER} per message.`;
@@ -54,20 +57,20 @@ class UploadAttachment extends Service {
 
     files.forEach((file, index) => {
       const { name, mimetype, size, md5 } = file;
-      const responseObject = UploadattachmentHelper.createResponseObject(md5, name);
+      const responseObject = Helper.createResponseObject(md5, name);
 
       if (size > uploadEnum.MAXIMUM_FILE_SIZE) {
         const error = `${name} is too big. Maximum size is ${uploadEnum.MAXIMUM_FILE_SIZE} bytes per file.`;
         filesToRemoveIndexes.push(index);
         const options = { status: uploadEnum.ERROR_RESPONSE, msg: error };
-        UploadattachmentHelper.updateResponseObject(responseObject, options);
+        Helper.updateResponseObject(responseObject, options);
       }
 
       if (!uploadEnum.ACCEPTED_FILE_TYPES.includes(mimetype)) {
         const error = `${name} has unsupported extension.`;
         filesToRemoveIndexes.push(index);
         const options = { status: uploadEnum.ERROR_RESPONSE, msg: error };
-        UploadattachmentHelper.updateResponseObject(responseObject, options);
+        Helper.updateResponseObject(responseObject, options);
       }
       responseInfo.push(responseObject);
     });
@@ -86,67 +89,63 @@ class UploadAttachment extends Service {
     }
   };
 
+  #getUploadedFiles = () => {
+    const { attachment } = this.state.request.files;
+    return Array.isArray(attachment) ? attachment : [attachment];
+  };
+
   processRequest = async () => {
-    await this.writeFilesToDisk();
-    if (this.state.attachments) {
-      this.updateAttachmentDatabase();
-      this.updateMessageDatabase();
-    }
+    this.decodeMessageRef();
+    await this.persistToDatabase();
     this.prepareResponseMessage();
     this.verifyErrorState();
     this.emitEvent('processing-finished');
   };
 
-  writeFilesToDisk = async () => {
-    const { requestFiles, responseInfo } = this.state;
+  decodeMessageRef = () => {
+    const { ref } = this.state;
+    const { id } = CipheringHandler.decryptData(ref);
+    this.setState({ id });
+  };
 
+  persistToDatabase = async () => {
+    const { id, requestFiles, responseInfo } = this.state;
     for (const file of requestFiles) {
-      const ref = ServiceHelper.hashRef(84);
+      const attachmentId = new ObjectId();
+      const attachmentDocument = this.createAttachmentDocument(attachmentId, file.data);
+      const attachmentSubdocument = this.createAttachmentSubdocument(attachmentId, file);
       try {
-        await file.mv(`./database/upload/${ref}`);
-        this.prepareDatabaseFileDetails(file, ref);
+        await this.databaseController.appendAttachmentToMessage(attachmentSubdocument, id);
+        await this.databaseController.addAttachmentBinary(attachmentDocument);
       } catch (error) {
-        const errorMessage = 'There were problems with saving the file.';
+        const errorMessage = this.getErrorMessage(error);
         const responseObject = responseInfo.find(response => response.md5 === file.md5);
         const options = { status: uploadEnum.ERROR_RESPONSE, msg: errorMessage };
-        UploadattachmentHelper.updateResponseObject(responseObject, options);
+        Helper.updateResponseObject(responseObject, options);
       }
     }
     this.setState({ responseInfo });
   };
 
-  prepareDatabaseFileDetails = (uploadedFile, fileRef) => {
-    if (!this.state.attachments) {
-      this.setState('attachments', []);
-    }
-    const { attachments } = this.state;
-    const { mimetype, name, size } = uploadedFile;
-    const uploadedFileObj = {
-      ref: fileRef,
-      mimetype,
-      name,
-      size,
+  getErrorMessage = error => {
+    return ServiceHelper.isDatabaseError(error)
+      ? error.message
+      : 'There were problems with saving the file.';
+  };
+
+  createAttachmentDocument = (_id, fileContentBuffer) => {
+    const data = {
+      _id,
+      message_id: this.state.id,
+      bin: new Binary(fileContentBuffer),
     };
-    attachments.push(uploadedFileObj);
+    return attachmentModel.databaseDocument(data);
   };
 
-  updateAttachmentDatabase = () => {
-    const { attachments } = this.state;
-    const attachmentsDb = ServiceHelper.getDbData('attachments');
-    attachments.forEach(attachment => attachmentsDb.push(attachment));
-    ServiceHelper.saveDbData(attachmentsDb, 'attachments');
-  };
-
-  updateMessageDatabase = () => {
-    const { attachments, messObj, messageDb } = this.state;
-    const { ref } = this.state.requestBody;
-    const message = messObj.msgs.find(msg => msg.ref === ref);
-
-    attachments.forEach(attachment => {
-      const { ref } = attachment;
-      message.attachments.push(ref);
-    });
-    ServiceHelper.saveDbData(messageDb, 'messages');
+  createAttachmentSubdocument = (id, file) => {
+    const { mimetype, name, size } = file;
+    const ref = CipheringHandler.encryptData({ id: id.toString(), type: 'A' });
+    return attachmentModel.databaseSubdocument({ mimetype, name, size, ref });
   };
 
   prepareResponseMessage = () => {
@@ -171,4 +170,4 @@ class UploadAttachment extends Service {
   };
 }
 
-module.exports = new UploadAttachment(ServiceEmitter, options);
+module.exports = new UploadAttachment(ServiceEmitter, DatabaseController, options);

@@ -1,4 +1,4 @@
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient, ObjectId, Binary } = require('mongodb');
 const databaseConfig = require('./database-config.js');
 const DatabaseError = require('./database-error');
 const dbError = require('../enums/db-errors');
@@ -186,7 +186,7 @@ class DatabaseController extends EventEmitter {
       this.#throwError('Item has not been persisted to the database.', 500);
     }
     if (insertedId !== item._id) {
-      await messagesCollection.deleteOne({ _id: insertedId });
+      await itemCollection.deleteOne({ _id: insertedId });
       this.#throwError('Item has not been persisted to the database.', 500);
     }
     this.#closeMongoClient();
@@ -196,6 +196,83 @@ class DatabaseController extends EventEmitter {
     }
 
     return insertedId;
+  };
+
+  addAttachmentBinary = async attachmentDocument => {
+    await this.#connectMongoClient();
+    const attachmentCollection = this.#getCollection('attachments');
+    const { insertedCount } = await attachmentCollection.insertOne(attachmentDocument);
+    if (insertedCount === 0) {
+      this.#throwError(dbError.ATTACH_NOT_SAVED, 500);
+    }
+    this.#closeMongoClient();
+  };
+
+  appendAttachmentToMessage = async (attachmentSubdocument, id) => {
+    await this.#connectMongoClient();
+    const messagesCollection = this.#getCollection('messages');
+    const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
+      { _id: ObjectId(id) },
+      {
+        $push: {
+          attach: attachmentSubdocument,
+        },
+      },
+    );
+
+    if (matchedCount === 0) {
+      this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
+    }
+
+    if (modifiedCount === 0) {
+      this.#throwError(dbError.ATTACH_NOT_SAVED, 500);
+    }
+    this.#closeMongoClient();
+  };
+
+  getAttachment = async id => {
+    await this.#connectMongoClient();
+    const attachmentCollection = this.#getCollection('attachments');
+    const attachment = await attachmentCollection.findOne({ _id: ObjectId(id) });
+    if (attachment === null) {
+      this.#throwError(dbError.ATTACH_NOT_FOUND, 404);
+    }
+    this.#closeMongoClient();
+    return attachment;
+  };
+
+  getAttachmentDetails = async (messageId, ref) => {
+    await this.#connectMongoClient();
+    const messagesCollection = this.#getCollection('messages');
+    const cursor = messagesCollection.aggregate([
+      { $match: { _id: ObjectId(messageId) } },
+      {
+        $project: {
+          attach: {
+            $filter: {
+              input: '$attach',
+              as: 'attachment',
+              cond: {
+                $eq: ['$$attachment.ref', ref],
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    if (!(await cursor.hasNext())) {
+      this.#closeMongoClient();
+      this.#throwError(dbError.ATTACH_NOT_FOUND, 404);
+    }
+
+    const [result] = await cursor.toArray();
+    this.#closeMongoClient();
+    if (result.attach.length) {
+      return result.attach[0];
+    } else {
+      this.#throwError(dbError.ATTACH_NOT_FOUND, 404);
+    }
   };
 }
 
