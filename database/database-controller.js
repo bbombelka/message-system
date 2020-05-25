@@ -274,6 +274,34 @@ class DatabaseController extends EventEmitter {
       this.#throwError(dbError.ATTACH_NOT_FOUND, 404);
     }
   };
+
+  deleteAttachmentBinary = async id => {
+    this.#connectMongoClient();
+    const attachmentCollection = this.#getCollection('attachments');
+    const { value } = await attachmentCollection.findOneAndDelete({ _id: ObjectId(id) });
+    this.#closeMongoClient();
+    if (value === null || !value.message_id) {
+      this.#throwError(dbError.ATTACH_NOT_FOUND, 404);
+    }
+    return value;
+  };
+
+  deleteAttachmentDetails = async (id, ref) => {
+    this.#connectMongoClient();
+    const messagesCollection = this.#getCollection('messages');
+    const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
+      { _id: ObjectId(id) },
+      { $pull: { attach: { ref } } },
+    );
+    if (matchedCount === 0) {
+      this.#throwError(dbError.MESSAGE_NO_ATTACH, 404);
+    }
+
+    if (modifiedCount === 0) {
+      this.#throwError(dbError.ATTACH_NOT_DELETED, 500);
+    }
+    this.#closeMongoClient();
+  };
 }
 
 module.exports = new DatabaseController();
