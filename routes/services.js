@@ -8,6 +8,7 @@ const getmessages = require('../services/getmessages/getmessages-service');
 const sendmessage = require('../services/sendmessage/sendmessage-service');
 const getattachment = require('../services/getattachment/getattachment-service');
 const deleteattachment = require('../services/deleteattachment/deleteattachment-service');
+const editmessage = require('../services/editmessage/editmessage-service');
 
 router.post('/getthreads', getthreads.service);
 router.post('/getmessages', getmessages.service);
@@ -17,5 +18,6 @@ router.post('/uploadattachment', uploadattachment.service);
 router.post('/sendmessage', sendmessage.service);
 router.post('/getattachment', getattachment.service);
 router.post('/deleteattachment', deleteattachment.service);
+router.post('/editmessage', editmessage.service);
 
 module.exports = router;

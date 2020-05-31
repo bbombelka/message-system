@@ -84,7 +84,7 @@ class GetMessages extends Service {
     const { messages, total } = this.state;
     const encryptedIdMessages = messages.map(message => {
       return {
-        ...MessageModel.parse(message),
+        ...MessageModel.client(message),
         ref: CipheringHandler.encryptData({ id: message._id.toString(), type: 'M' }),
       };
     });

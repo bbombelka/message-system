@@ -328,6 +328,28 @@ class DatabaseController extends EventEmitter {
     }
     this.#closeMongoClient();
   };
+
+  updateMessage = async (id, text) => {
+    this.#connectMongoClient();
+    const messagesCollection = this.#getCollection('messages');
+    const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
+      { _id: ObjectId(id) },
+      { $set: { text } },
+    );
+    if (matchedCount === 0) {
+      this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
+    }
+
+    if (modifiedCount === 0) {
+      this.#throwError(dbError.MESSAGE_NOT_UPDATED, 500);
+    }
+
+    const lastUpdated = new Date();
+    messagesCollection.updateOne({ _id: ObjectId(id) }, { $set: { lastUpdated } });
+
+    this.#closeMongoClient();
+    return lastUpdated;
+  };
 }
 
 module.exports = new DatabaseController();

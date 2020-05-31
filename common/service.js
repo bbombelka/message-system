@@ -1,5 +1,6 @@
 const isNull = require('../utils/isNull');
 const ServiceHelper = require('../services/service-helper');
+const DatabaseError = require('../database/database-error');
 
 class Service {
   constructor(serviceEmitter, databaseController) {
@@ -100,6 +101,10 @@ class Service {
     error
       ? response.status(statusCode).json(ServiceHelper.formatErrorResponse(responseBody))
       : response.status(200).json(ServiceHelper.formatResponse(responseBody));
+  };
+
+  throwError = (errorMessage, statusCode) => {
+    throw new DatabaseError(errorMessage, statusCode);
   };
 }
 

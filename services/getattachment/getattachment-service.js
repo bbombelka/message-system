@@ -1,8 +1,9 @@
+const CipheringHandler = require('../../common/ciphering-handler');
+const DatabaseController = require('../../database/database-controller');
 const Service = require('../../common/service');
 const ServiceEmitter = require('../event-emitter');
+const ServiceHelper = require('../service-helper');
 const path = require('path');
-const DatabaseController = require('../../database/database-controller');
-const CipheringHandler = require('../../common/ciphering-handler');
 const fs = require('fs');
 const { PassThrough } = require('stream');
 const config = require('../../config');
@@ -41,8 +42,15 @@ class GetAttachment extends Service {
         ? await this.processAllAttachments()
         : await this.processSingleAttachment();
     } catch (error) {
-      this.finishProcessWithError('There were problems with downloading the file.', 404);
+      const errorMessage = this.getErrorMessage(error);
+      this.finishProcessWithError(...errorMessage);
     }
+  };
+
+  getErrorMessage = error => {
+    return ServiceHelper.isDatabaseError(error)
+      ? [error.message, error.statusCode]
+      : ['There were problems with deleting the file.', 400];
   };
 
   decodeRef = () => {

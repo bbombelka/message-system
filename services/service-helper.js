@@ -38,6 +38,10 @@ class ServiceHelper {
     return type === 'T';
   }
 
+  static itemIsMessage(type) {
+    return type === 'M';
+  }
+
   static isDatabaseError({ type }) {
     return type === 'db';
   }
