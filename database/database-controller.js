@@ -332,13 +332,21 @@ class DatabaseController extends EventEmitter {
   updateMessage = async (id, text) => {
     this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
-    const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
+    const cursor = messagesCollection.find({ _id: ObjectId(id) });
+
+    if ((await cursor.count()) !== 1) {
+      this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
+    }
+
+    if (!(await cursor.filter({ processed: 'N' }).hasNext())) {
+      this.#throwError(dbError.MESSAGE_NO_EDIT, 400);
+    }
+    cursor.close();
+
+    const { modifiedCount } = await messagesCollection.updateOne(
       { _id: ObjectId(id) },
       { $set: { text } },
     );
-    if (matchedCount === 0) {
-      this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
-    }
 
     if (modifiedCount === 0) {
       this.#throwError(dbError.MESSAGE_NOT_UPDATED, 500);

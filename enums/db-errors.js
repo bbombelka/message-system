@@ -7,6 +7,7 @@ module.exports = {
   MESSAGE_NO_ATTACH: 'Message containing requested attachment has not been found in database.',
   MESSAGE_NOT_UPDATED: 'Message has not been updated. Provide altered content.',
   ATTACH_NOT_SAVED: 'Attachment has not been saved to database. ',
+  MESSAGE_NO_EDIT: 'Message is not fit for edition',
   ATTACH_NOT_FOUND: 'Attachment has not been found in database.',
   ATTACH_NOT_DELETED: 'Attachment has not been deleted.',
 };
