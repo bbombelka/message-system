@@ -13,7 +13,7 @@ module.exports = {
       lastUpdated,
     };
   },
-  database: ({ _id, thread_id, title, text, attach, type }) => {
+  database: ({ _id, thread_id, title, text, attach, type, user_id }) => {
     return {
       _id,
       thread_id,
@@ -24,7 +24,7 @@ module.exports = {
       attach: attach || [],
       type,
       processed: bool.FALSE,
-      login: 'Barty-boy',
+      user_id,
     };
   },
   email: ({ date, title, text, read }) => `
