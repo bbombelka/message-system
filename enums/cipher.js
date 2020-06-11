@@ -9,4 +9,7 @@ module.exports = {
   },
   SALT: 'salt',
   PASSWORD: 'complex pass',
+  ITERATION_NUMBER: 10000,
+  KEY_LENGTH: 512,
+  DIGEST_HASH: 'sha512',
 };

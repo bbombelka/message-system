@@ -18,8 +18,7 @@ class DeleteItem extends Service {
   }
 
   checkParameters = () => {
-    const { requestBody } = this.state;
-    const { ref = undefined } = requestBody;
+    const { ref = undefined } = this.state.requestBody;
     if (!ref) {
       return this.finishProcessWithError('Reference parameter is missing.', 400);
     }

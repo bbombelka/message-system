@@ -56,6 +56,22 @@ class CipheringHandler {
     decryptedData += decipher.final(cipherEnum.ENCODING.UTF8);
     return this.#prepareDataToUse(decryptedData);
   };
+
+  hashPassword = (password, salt) => {
+    return new Promise((resolve, reject) => {
+      crypto.pbkdf2(
+        password,
+        salt,
+        cipherEnum.ITERATION_NUMBER,
+        cipherEnum.KEY_LENGTH,
+        cipherEnum.DIGEST_HASH,
+        (err, derivedKeyBuffer) => {
+          if (err) reject(new Error('There were problems with password hash.'));
+          resolve(derivedKeyBuffer.toString(cipherEnum.ENCODING.HEX));
+        },
+      );
+    });
+  };
 }
 
 module.exports = new CipheringHandler();

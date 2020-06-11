@@ -358,6 +358,17 @@ class DatabaseController extends EventEmitter {
     this.#closeMongoClient();
     return lastUpdated;
   };
+
+  getUser = async login => {
+    this.#connectMongoClient();
+    const usersCollection = this.#getCollection('users');
+    const user = await usersCollection.findOne({ login });
+    this.#closeMongoClient();
+    if (!user) {
+      this.#throwError('User with that login does not exist.');
+    }
+    return user;
+  };
 }
 
 module.exports = new DatabaseController();
