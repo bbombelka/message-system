@@ -11,6 +11,8 @@ const getattachment = require('../services/getattachment/getattachment-service')
 const deleteattachment = require('../services/deleteattachment/deleteattachment-service');
 const editmessage = require('../services/editmessage/editmessage-service');
 const login = require('../services/login/login-service');
+const logout = require('../services/logout/logout-service');
+const renewtoken = require('../services/renewtoken/renewtoken-service')
 
 router.use(tokenHandler.verifyToken);
 
@@ -24,5 +26,7 @@ router.post('/getattachment', getattachment.service);
 router.post('/deleteattachment', deleteattachment.service);
 router.post('/editmessage', editmessage.service);
 router.post('/login', login.service);
+router.post('/logout', logout.service);
+router.post('/renewtoken', renewtoken.service)
 
 module.exports = router;

@@ -34,9 +34,11 @@ class Service {
 
   performValidation = () => {
     const { validationList } = this.state.options;
-    for (const validation of validationList) {
-      this[validation]();
-      if (this.state.error) break;
+    if (validationList.length) {
+      for (const validation of validationList) {
+        this[validation]();
+        if (this.state.error) break;
+      }
     }
   };
 

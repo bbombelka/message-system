@@ -2,11 +2,21 @@ const jwt = require('jsonwebtoken');
 const ServiceHelper = require('../services/service-helper');
 const config = require('../config');
 const protectedRoutes = require('../enums/protected-routes');
+const fs = require('fs');
 
 class TokenHandler {
-  signToken = user => {
+  constructor() {
+    this.#prepareTokenSecret();
+  }
+
+  signToken = (user, type = 'access') => {
+    const options =
+      type === 'access'
+        ? [this.accessTokenSecret, { expiresIn: config.accessTokenExpirationTime }]
+        : [this.refreshTokenSecret, { expiresIn: config.refreshTokenExpirationTime }];
+
     return new Promise((resolve, reject) => {
-      jwt.sign(user, 'token secret', { expiresIn: config.tokenExpirationTime }, (err, token) => {
+      jwt.sign(user, ...options, (err, token) => {
         if (err) reject(err);
         resolve(token);
       });
@@ -20,10 +30,10 @@ class TokenHandler {
 
     try {
       const token = this.#getToken(request);
-      await this.#performVerification(token);
+      await this.performVerification(token);
       next();
     } catch (error) {
-      this.#handleErrorResponse(error, response);
+      this.#handleError(error, response);
     }
   };
 
@@ -46,9 +56,11 @@ class TokenHandler {
     throw new Error('invalid token');
   };
 
-  #performVerification = token => {
+  performVerification = (token, type = 'access') => {
+    const tokenSecret = type === 'access' ? this.accessTokenSecret : this.refreshTokenSecret;
+
     return new Promise((resolve, reject) => {
-      jwt.verify(token, 'token secret', (err, tokenData) => {
+      jwt.verify(token, tokenSecret, (err, tokenData) => {
         if (err) {
           reject(err);
         }
@@ -57,7 +69,7 @@ class TokenHandler {
     });
   };
 
-  #handleErrorResponse = (error, response) => {
+  #handleError = (error, response) => {
     const errorMessage = this.#getErrorMessage(error);
     response.status(403).json(ServiceHelper.formatErrorResponse(errorMessage));
   };
@@ -73,6 +85,17 @@ class TokenHandler {
       default:
         return 'An error occured relating web token.';
     }
+  };
+
+  #prepareTokenSecret = () => {
+    fs.promises
+      .readFile(config.tokenSecretPath)
+      .then(fileContent => {
+        const data = JSON.parse(fileContent.toString());
+        this.accessTokenSecret = data['ACCESS_TOKEN_SECRET'];
+        this.refreshTokenSecret = data['REFRESH_TOKEN_SECRET'];
+      })
+      .catch(error => console.log(error));
   };
 }
 
