@@ -30,7 +30,8 @@ class TokenHandler {
 
     try {
       const token = this.#getToken(request);
-      await this.performVerification(token);
+      const { login } = await this.performVerification(token);
+      response.locals.login = login;
       next();
     } catch (error) {
       this.#handleError(error, response);

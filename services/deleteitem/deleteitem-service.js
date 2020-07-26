@@ -4,17 +4,20 @@ const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const Helper = require('../service-helper');
+const redisClient = require('../redis');
+const config = require('../../config');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 
 class DeleteItem extends Service {
-  constructor(serviceEmitter, DatabaseController, { prefix }) {
+  constructor(serviceEmitter, DatabaseController, redisCache, { prefix }) {
     super(serviceEmitter, DatabaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
     this.setValidation('checkParameters');
+    this.redisCache = redisCache;
   }
 
   checkParameters = () => {
@@ -31,6 +34,7 @@ class DeleteItem extends Service {
   processRequest = async () => {
     try {
       const { ref } = this.state;
+      !config.cacheIsDisabled && (await this.clearCache());
       const { id, type } = CipheringHandler.decryptData(ref);
 
       if (Helper.itemIsThread(type)) {
@@ -38,7 +42,6 @@ class DeleteItem extends Service {
       } else {
         await this.deleteMessage(id);
       }
-
       this.emitEvent('processing-finished');
     } catch (error) {
       const errorBody = Helper.isDatabaseError(error)
@@ -71,6 +74,13 @@ class DeleteItem extends Service {
     }
     this.prepareResponse(messagesLeft);
   };
+
+  clearCache = () => {
+    return new Promise((resolve, reject) => {
+      resolve(this.redisCache);
+      // Clearin cache is tricky on windows platform as redis works only in legacy version . . .
+    });
+  };
 }
 
-module.exports = new DeleteItem(ServiceEmitter, DatabaseController, options);
+module.exports = new DeleteItem(ServiceEmitter, DatabaseController, redisClient, options);

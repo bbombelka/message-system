@@ -5,17 +5,20 @@ const DatabaseController = require('../../database/database-controller');
 const MessageModel = require('../../models/message-model');
 const CipheringHandler = require('../../common/ciphering-handler');
 const Helper = require('./getmessages-helper');
+const redisClient = require('../redis');
+const config = require('../../config');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 
 class GetMessages extends Service {
-  constructor(serviceEmitter, DatabaseController, { prefix }) {
+  constructor(serviceEmitter, DatabaseController, redisCache, { prefix }) {
     super(serviceEmitter, DatabaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
     this.setValidation('checkParameters');
+    this.redisCache = redisCache;
   }
 
   checkParameters = () => {
@@ -46,6 +49,13 @@ class GetMessages extends Service {
 
   processRequest = async () => {
     try {
+      if (!config.cacheIsDisabled) {
+        this.getRedisKey();
+        await this.checkCache();
+        if (this.state.isCached) {
+          return this.respondWithCachedData();
+        }
+      }
       this.getParamsForSelectingResponseBodyMessages();
       await this.selectMessagesToSend();
     } catch (error) {
@@ -56,12 +66,37 @@ class GetMessages extends Service {
 
       return this.finishProcessWithError(...errorBody);
     }
-
-    const { messages } = this.state;
+    !config.cacheIsDisabled && this.cacheResponse();
     this.emitEvent('processing-finished');
-    if (Helper.payloadHasUnreadMessages(messages)) {
+    if (Helper.payloadHasUnreadMessages(this.state.messages)) {
       this.databaseController.emit('messages-sent', this.getSentMessagesDetails());
     }
+  };
+
+  getRedisKey = () => {
+    const { login } = this.state.response.locals;
+    const { originalUrl } = this.state.request;
+    const { numberOfMessagesToIgnore, numberOfMessagesToSend } = this.state;
+    const redisKey =
+      login + originalUrl + '/' + numberOfMessagesToSend + '/' + numberOfMessagesToIgnore;
+    this.setState({ redisKey });
+  };
+
+  checkCache = () => {
+    const { redisKey } = this.state;
+
+    return new Promise(resolve => {
+      this.redisCache.get(redisKey, (err, data) => {
+        if (err || !data) return resolve(this.setState('isCached', false));
+        this.setState({ isCached: true, cachedData: JSON.parse(data) });
+        resolve();
+      });
+    });
+  };
+
+  respondWithCachedData = () => {
+    this.setState('responseBody', this.state.cachedData);
+    this.emitEvent('processing-finished');
   };
 
   getParamsForSelectingResponseBodyMessages = () => {
@@ -102,6 +137,12 @@ class GetMessages extends Service {
       threadId: messages[0].thread_id,
     };
   };
+
+  cacheResponse = () => {
+    const { responseBody, redisKey } = this.state;
+
+    this.redisCache.setex(redisKey, config.cacheExpiration, JSON.stringify(responseBody));
+  };
 }
 
-module.exports = new GetMessages(ServiceEmitter, DatabaseController, options);
+module.exports = new GetMessages(ServiceEmitter, DatabaseController, redisClient, options);

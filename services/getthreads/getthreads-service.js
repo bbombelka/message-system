@@ -4,29 +4,66 @@ const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const ThreadModel = require('../../models/thread-model');
+const redisClient = require('../redis');
+const config = require('../../config');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
 
 class GetThreads extends Service {
-  constructor(serviceEmitter, databaseController, { prefix }) {
+  constructor(serviceEmitter, databaseController, redisCache, { prefix }) {
     super(serviceEmitter, databaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
     this.setValidation('prepareParameters');
+    this.redisCache = redisCache;
   }
 
   processRequest = async () => {
     try {
+      if (!config.cacheIsDisabled) {
+        this.getRedisKey();
+        await this.checkCache();
+        if (this.state.isCached) {
+          return this.respondWithCachedData();
+        }
+      }
       await this.getTotalThreadsNumber();
       if (!this.state.error) {
         await this.selectThreadsToSend();
+        !config.cacheIsDisabled && this.cacheResponse();
       }
       this.emitEvent('processing-finished');
     } catch (error) {
       this.finishProcessWithError('There has been a server error', 400);
     }
+  };
+
+  checkCache = () => {
+    const { redisKey } = this.state;
+
+    return new Promise(resolve => {
+      this.redisCache.get(redisKey, (err, data) => {
+        if (err || !data) return resolve(this.setState('isCached', false));
+        this.setState({ isCached: true, cachedData: JSON.parse(data) });
+        resolve();
+      });
+    });
+  };
+
+  getRedisKey = () => {
+    const { login } = this.state.response.locals;
+    const { originalUrl } = this.state.request;
+    const { numberOfThreadsToIgnore, numberOfThreadsToSend } = this.state;
+    const redisKey =
+      login + originalUrl + '/' + numberOfThreadsToSend + '/' + numberOfThreadsToIgnore;
+    this.setState({ redisKey });
+  };
+
+  respondWithCachedData = () => {
+    this.setState('responseBody', this.state.cachedData);
+    this.emitEvent('processing-finished');
   };
 
   prepareParameters = () => {
@@ -83,6 +120,12 @@ class GetThreads extends Service {
 
     this.setState('responseBody', { threads: encryptedIdThreads, total: numberOfThreadsOnServer });
   };
+
+  cacheResponse = () => {
+    const { responseBody, redisKey } = this.state;
+
+    this.redisCache.setex(redisKey, config.cacheExpiration, JSON.stringify(responseBody));
+  };
 }
 
-module.exports = new GetThreads(ServiceEmitter, DatabaseController, options);
+module.exports = new GetThreads(ServiceEmitter, DatabaseController, redisClient, options);
