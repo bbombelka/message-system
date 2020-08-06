@@ -2,3 +2,4 @@
 /logs/
 /file-cache/
 jwt.json
+db.json

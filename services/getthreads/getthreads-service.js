@@ -53,7 +53,7 @@ class GetThreads extends Service {
   };
 
   getRedisKey = () => {
-    const { login } = this.state.response.locals;
+    const { login } = this.state.response.locals.tokenData;
     const { originalUrl } = this.state.request;
     const { numberOfThreadsToIgnore, numberOfThreadsToSend } = this.state;
     const redisKey =
@@ -85,7 +85,8 @@ class GetThreads extends Service {
   };
 
   getTotalThreadsNumber = async () => {
-    const numberOfThreadsOnServer = await this.databaseController.getThreadNumber();
+    const user_id = this.state.response.locals.tokenData._id;
+    const numberOfThreadsOnServer = await this.databaseController.getThreadNumber(user_id);
     const { numberOfThreadsToIgnore } = this.state;
 
     if (numberOfThreadsToIgnore > numberOfThreadsOnServer) {
@@ -100,8 +101,9 @@ class GetThreads extends Service {
 
   selectThreadsToSend = async () => {
     const { numberOfThreadsToSend, numberOfThreadsToIgnore } = this.state;
-
+    const user_id = this.state.response.locals.tokenData._id;
     const threads = await this.databaseController.getThreads(
+      user_id,
       parseInt(numberOfThreadsToSend),
       parseInt(numberOfThreadsToIgnore),
     );

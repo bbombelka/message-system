@@ -74,7 +74,7 @@ class GetMessages extends Service {
   };
 
   getRedisKey = () => {
-    const { login } = this.state.response.locals;
+    const { login } = this.state.response.locals.tokenData;
     const { originalUrl } = this.state.request;
     const { numberOfMessagesToIgnore, numberOfMessagesToSend } = this.state;
     const redisKey =

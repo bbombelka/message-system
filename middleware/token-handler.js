@@ -9,11 +9,14 @@ class TokenHandler {
     this.#prepareTokenSecret();
   }
 
+  #getSignTokenOptions = type => {
+    return type === 'access'
+      ? [this.accessTokenSecret, { expiresIn: config.accessTokenExpirationTime }]
+      : [this.refreshTokenSecret, { expiresIn: config.refreshTokenExpirationTime }];
+  };
+
   signToken = (user, type = 'access') => {
-    const options =
-      type === 'access'
-        ? [this.accessTokenSecret, { expiresIn: config.accessTokenExpirationTime }]
-        : [this.refreshTokenSecret, { expiresIn: config.refreshTokenExpirationTime }];
+    const options = this.#getSignTokenOptions(type);
 
     return new Promise((resolve, reject) => {
       jwt.sign(user, ...options, (err, token) => {
@@ -30,8 +33,8 @@ class TokenHandler {
 
     try {
       const token = this.#getToken(request);
-      const { login } = await this.performVerification(token);
-      response.locals.login = login;
+      const tokenData = await this.performVerification(token);
+      response.locals.tokenData = tokenData;
       next();
     } catch (error) {
       this.#handleError(error, response);

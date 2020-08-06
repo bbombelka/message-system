@@ -1,4 +1,4 @@
-const { MongoClient, ObjectId, Binary } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const databaseConfig = require('./database-config.js');
 const DatabaseError = require('./database-error');
 const dbError = require('../enums/db-errors');
@@ -18,7 +18,7 @@ class DatabaseController extends EventEmitter {
   };
 
   #connectMongoClient = async () => {
-    this.client = new MongoClient(databaseConfig.url, { useUnifiedTopology: true });
+    this.client = new MongoClient(databaseConfig.uri, { useUnifiedTopology: true });
     await this.client.connect();
   };
 
@@ -85,18 +85,18 @@ class DatabaseController extends EventEmitter {
     this.#closeMongoClient();
   };
 
-  getThreadNumber = async () => {
+  getThreadNumber = async user_id => {
     await this.#connectMongoClient();
     const threadsCollection = this.#getCollection('threads');
-    const total = await threadsCollection.countDocuments();
+    const total = await threadsCollection.countDocuments({ user_id });
     this.#closeMongoClient();
     return total;
   };
 
-  getThreads = async (limit, skip) => {
+  getThreads = async (user_id, limit, skip) => {
     await this.#connectMongoClient();
     const threadsCollection = this.#getCollection('threads');
-    const threads = await threadsCollection.find({}, { limit, skip }).toArray();
+    const threads = await threadsCollection.find({ user_id }, { limit, skip }).toArray();
     this.#closeMongoClient();
     return threads;
   };
@@ -360,7 +360,7 @@ class DatabaseController extends EventEmitter {
   };
 
   getUser = async login => {
-    this.#connectMongoClient();
+    await this.#connectMongoClient();
     const usersCollection = this.#getCollection('users');
     const user = await usersCollection.findOne({ login });
     this.#closeMongoClient();

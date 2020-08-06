@@ -13,7 +13,7 @@ module.exports = {
       read,
     };
   },
-  database: ({ _id, title, cu, cd }) => {
+  database: ({ _id, title, cu, cd, user_id }) => {
     return {
       _id,
       cu: cu || bool.TRUE,
@@ -24,6 +24,7 @@ module.exports = {
       type: 'C',
       read: bool.TRUE,
       title,
+      user_id,
     };
   },
 };

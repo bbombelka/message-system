@@ -95,6 +95,7 @@ class DeleteItem extends Service {
 
   getMessageBody = threadId => {
     const { text, title } = this.state;
+    const user_id = this.state.response.locals.tokenData._id;
     const _id = new ObjectId();
     const messageParams = {
       _id,
@@ -102,6 +103,7 @@ class DeleteItem extends Service {
       text,
       title,
       type: 'O',
+      user_id,
     };
 
     return messageModel.database(messageParams);
@@ -120,11 +122,13 @@ class DeleteItem extends Service {
   };
 
   getThreadBody = () => {
+    const user_id = this.state.response.locals.tokenData._id;
     const { title } = this.state;
     const threadId = new ObjectId();
     const threadParams = {
       _id: threadId,
       title,
+      user_id,
     };
     return threadModel.database(threadParams);
   };
