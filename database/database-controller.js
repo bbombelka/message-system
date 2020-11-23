@@ -12,9 +12,9 @@ class DatabaseController extends EventEmitter {
   }
 
   #attachListeners = () => {
-    this.on('message-added', threadId => this.#onAddedMessage(threadId));
-    this.on('message-deleted', threadId => this.#onDeletedMessage(threadId));
-    this.on('messages-sent', messagesDetails => this.#onSentMessages(messagesDetails));
+    this.on('message-added', (threadId) => this.#onAddedMessage(threadId));
+    this.on('message-deleted', (threadId, deletedCount) => this.#onDeletedMessage(threadId, deletedCount));
+    this.on('messages-sent', (messagesDetails) => this.#onSentMessages(messagesDetails));
   };
 
   #connectMongoClient = async () => {
@@ -30,62 +30,87 @@ class DatabaseController extends EventEmitter {
     throw new DatabaseError(errorMessage, statusCode);
   };
 
-  #getCollection = collectionName => {
+  #getCollection = (collectionName) => {
     return this.client.db(databaseConfig.database).collection(collectionName);
   };
 
-  #onAddedMessage = async id => {
+  #onAddedMessage = async (id) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
     await threads.updateOne({ _id: ObjectId(id) }, { $inc: { nummess: 1 } });
     this.#closeMongoClient();
   };
 
-  #onDeletedMessage = async id => {
+  #onDeletedMessage = async (id, deletedCount) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
-    await threads.updateOne({ _id: ObjectId(id) }, { $inc: { nummess: -1 } });
-    this.#closeMongoClient();
-  };
-
-  #onSentMessages = async ({ messagesIds, threadId }) => {
-    await this.#connectMongoClient();
-    const messages = this.#getCollection('messages');
-    const { modifiedCount } = await messages.updateMany(
-      { read: bool.FALSE, _id: { $in: messagesIds } },
-      { $set: { read: bool.TRUE } },
+    const result = await threads.findOneAndUpdate(
+      { _id: ObjectId(id) },
+      { $inc: { nummess: -deletedCount } },
+      { returnOriginal: false }
     );
     this.#closeMongoClient();
-    this.#changeUnreadCount(modifiedCount, threadId);
   };
 
-  #changeUnreadCount = async (readMessages, threadId) => {
+  #onSentMessages = async ({ messagesIds, threadId, totalMessageNumber }) => {
+    await this.#connectMongoClient();
+    const messages = this.#getCollection('messages');
+    const { modifiedCount } = await messages.updateMany({ _id: { $in: messagesIds } }, { $set: { read: bool.TRUE } });
+    this.#closeMongoClient();
+    this.#changeUnreadCount(modifiedCount, threadId, totalMessageNumber);
+  };
+
+  #changeUnreadCount = async (numberOfReadMessages, threadId, totalMessageNumber) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
 
     const { value, lastErrorObject } = await threads.findOneAndUpdate(
       { _id: ObjectId(threadId) },
-      { $inc: { unreadmess: -readMessages } },
-      { returnOriginal: false },
+      { $inc: { unreadmess: -numberOfReadMessages } },
+      { returnOriginal: false }
     );
 
     this.#closeMongoClient();
+
     if (value.unreadmess === 0) {
       this.#markThreadAsRead(threadId);
     }
+
+    if (value.unreadmess < 0) {
+      this.#checkThreadMessageNumberSync(value, totalMessageNumber);
+    }
+
     if (!lastErrorObject.ok) {
       // perform check if thread data is in sync with messages state
     }
   };
 
-  #markThreadAsRead = async threadId => {
+  #markThreadAsRead = async (threadId) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
     await threads.updateOne({ _id: ObjectId(threadId) }, { $set: { read: bool.TRUE } });
     this.#closeMongoClient();
   };
 
-  getThreadNumber = async user_id => {
+  #checkThreadMessageNumberSync = async (thread, totalMessageNumber) => {
+    await this.#connectMongoClient();
+    const messages = this.#getCollection('messages');
+    const numberOfUnreadMessages = await messages.find({ thread_id: thread._id, read: bool.FALSE }).count();
+    const { unreadmess, nummess } = thread;
+    const newnummessValue = totalMessageNumber === nummess ? nummess : totalMessageNumber;
+    const newUnreadmessValue = numberOfUnreadMessages === unreadmess ? unreadmess : numberOfUnreadMessages;
+    const newReadValue = newUnreadmessValue === 0 ? bool.TRUE : bool.FALSE;
+    const threads = this.#getCollection('threads');
+
+    await threads.findOneAndUpdate(
+      { _id: thread._id },
+      { $set: { nummess: newnummessValue, unreadmess: newUnreadmessValue, read: newReadValue } }
+    );
+
+    this.#closeMongoClient();
+  };
+
+  getThreadNumber = async (user_id) => {
     await this.#connectMongoClient();
     const threadsCollection = this.#getCollection('threads');
     const total = await threadsCollection.countDocuments({ user_id });
@@ -101,7 +126,7 @@ class DatabaseController extends EventEmitter {
     return threads;
   };
 
-  getMessageNumber = async id => {
+  getMessageNumber = async (id) => {
     await this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
     const total = await messagesCollection.countDocuments({ thread_id: id });
@@ -109,12 +134,12 @@ class DatabaseController extends EventEmitter {
     return total;
   };
 
-  getMessages = async ({ id, limit = 0, skip = 0 }) => {
+  getMessages = async ({ threadIds, limit = 0, skip = 0 }) => {
     await this.#connectMongoClient();
     const cursor = this.client
       .db(databaseConfig.database)
       .collection('messages')
-      .find({ thread_id: id });
+      .find({ thread_id: { $in: threadIds } });
 
     const totalMessages = await cursor.count();
 
@@ -128,13 +153,13 @@ class DatabaseController extends EventEmitter {
     return { messages, total: totalMessages };
   };
 
-  deleteThread = async (id, options) => {
+  deleteThread = async (idArray, options = {}) => {
     await this.#connectMongoClient();
     const { lastMessageDeleted = false } = options;
     const { deletedCount } = await this.client
       .db(databaseConfig.database)
       .collection('threads')
-      .deleteOne({ _id: ObjectId(id) });
+      .deleteMany({ _id: { $in: idArray } });
 
     if (deletedCount === 0) {
       this.#throwError(dbError.THREAD_NOT_FOUND, 404);
@@ -142,20 +167,22 @@ class DatabaseController extends EventEmitter {
 
     this.#closeMongoClient();
     if (!lastMessageDeleted) {
-      this.#deleteMessages(id);
+      this.#deleteMessages(idArray);
     }
   };
 
-  #deleteMessages = async id => {
+  #deleteMessages = async (idArray) => {
+    const threadIds = idArray.map((id) => id.toString());
+    const query = { thread_id: { $in: threadIds } };
     await this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
-    const numberOfMessagesToDelete = await messagesCollection.countDocuments({ thread_id: id });
+    const numberOfMessagesToDelete = await messagesCollection.countDocuments(query);
 
     if (numberOfMessagesToDelete === 0) {
       // only log inconsistency, irrelevant for user
     }
 
-    const { deletedCount } = await messagesCollection.deleteMany({ thread_id: id });
+    const { deletedCount } = await messagesCollection.deleteMany(query);
 
     if (numberOfMessagesToDelete !== deletedCount) {
       // log incosistency, irrelevant for user
@@ -163,19 +190,21 @@ class DatabaseController extends EventEmitter {
     this.#closeMongoClient();
   };
 
-  deleteMessage = async id => {
+  deleteMessage = async (idArray) => {
     await this.#connectMongoClient();
-    const { value } = await this.client
-      .db(databaseConfig.database)
-      .collection('messages')
-      .findOneAndDelete({ _id: ObjectId(id) });
+    const messages = this.client.db(databaseConfig.database).collection('messages');
+    const cursor = messages.find({ _id: { $in: idArray } }).map(({ thread_id }) => thread_id);
+    const threadsId = await cursor.toArray();
+    const threadId = threadsId.pop();
+    const { deletedCount } = await messages.deleteMany({ _id: { $in: idArray } });
 
-    if (!value) {
+    if (deletedCount === 0) {
       this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
     }
+
     this.#closeMongoClient();
-    this.emit('message-deleted', value.thread_id);
-    return value.thread_id;
+    this.emit('message-deleted', threadId);
+    return threadId;
   };
 
   addToCollection = async (item, collectionName) => {
@@ -198,7 +227,7 @@ class DatabaseController extends EventEmitter {
     return insertedId;
   };
 
-  addAttachmentBinary = async attachmentDocument => {
+  addAttachmentBinary = async (attachmentDocument) => {
     await this.#connectMongoClient();
     const attachmentCollection = this.#getCollection('attachments');
     const { insertedCount } = await attachmentCollection.insertOne(attachmentDocument);
@@ -217,7 +246,7 @@ class DatabaseController extends EventEmitter {
         $push: {
           attach: attachmentSubdocument,
         },
-      },
+      }
     );
 
     if (matchedCount === 0) {
@@ -230,7 +259,7 @@ class DatabaseController extends EventEmitter {
     this.#closeMongoClient();
   };
 
-  getAttachment = async id => {
+  getAttachment = async (id) => {
     await this.#connectMongoClient();
     const attachmentCollection = this.#getCollection('attachments');
     const attachment = await attachmentCollection.findOne({ _id: ObjectId(id) });
@@ -275,8 +304,8 @@ class DatabaseController extends EventEmitter {
     }
   };
 
-  getAllAttachments = async id => {
-    this.#connectMongoClient();
+  getAllAttachments = async (id) => {
+    await this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
     const messageWithAttachments = await messagesCollection.findOne({ _id: ObjectId(id) });
     if (messageWithAttachments === null) {
@@ -286,8 +315,8 @@ class DatabaseController extends EventEmitter {
     return messageWithAttachments.attach;
   };
 
-  getAllAttachmentsBinaries = async id => {
-    this.#connectMongoClient();
+  getAllAttachmentsBinaries = async (id) => {
+    await this.#connectMongoClient();
     const attachmentCollection = this.#getCollection('attachments');
     const cursor = attachmentCollection.find({ message_id: id });
 
@@ -301,7 +330,7 @@ class DatabaseController extends EventEmitter {
     return result;
   };
 
-  deleteAttachmentBinary = async id => {
+  deleteAttachmentBinary = async (id) => {
     this.#connectMongoClient();
     const attachmentCollection = this.#getCollection('attachments');
     const { value } = await attachmentCollection.findOneAndDelete({ _id: ObjectId(id) });
@@ -317,7 +346,7 @@ class DatabaseController extends EventEmitter {
     const messagesCollection = this.#getCollection('messages');
     const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
       { _id: ObjectId(id) },
-      { $pull: { attach: { ref } } },
+      { $pull: { attach: { ref } } }
     );
     if (matchedCount === 0) {
       this.#throwError(dbError.MESSAGE_NO_ATTACH, 404);
@@ -343,10 +372,7 @@ class DatabaseController extends EventEmitter {
     }
     cursor.close();
 
-    const { modifiedCount } = await messagesCollection.updateOne(
-      { _id: ObjectId(id) },
-      { $set: { text } },
-    );
+    const { modifiedCount } = await messagesCollection.updateOne({ _id: ObjectId(id) }, { $set: { text } });
 
     if (modifiedCount === 0) {
       this.#throwError(dbError.MESSAGE_NOT_UPDATED, 500);
@@ -359,7 +385,7 @@ class DatabaseController extends EventEmitter {
     return lastUpdated;
   };
 
-  getUser = async login => {
+  getUser = async (login) => {
     await this.#connectMongoClient();
     const usersCollection = this.#getCollection('users');
     const user = await usersCollection.findOne({ login });

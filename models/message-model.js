@@ -1,14 +1,14 @@
 const bool = require('../enums/boolean');
 
 module.exports = {
-  client: ({ ref, title, date, text, read, attachments, type, processed, lastUpdated }) => {
+  client: ({ ref, title, date, text, read, attach, type, processed, lastUpdated }) => {
     return {
       ref,
       title,
       text,
       date,
       read,
-      attach: [] || attachments,
+      attach: attach || [],
       processed: type === 'I' ? undefined : processed,
       lastUpdated,
     };

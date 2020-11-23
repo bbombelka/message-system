@@ -27,13 +27,13 @@ class GetMessages extends Service {
     const numberOfMessagesToIgnore = requestBody.skip;
     const ref = requestBody.ref;
 
-    if (typeof numberOfMessagesToSend !== 'string' || !numberOfMessagesToSend.length) {
+    if (!numberOfMessagesToSend) {
       return this.finishProcessWithError('Num parameter is missing.', 400);
     }
-    if (typeof numberOfMessagesToIgnore !== 'string' || !numberOfMessagesToIgnore.length) {
+    if (!numberOfMessagesToIgnore && numberOfMessagesToIgnore !== 0) {
       return this.finishProcessWithError('Skip parameter is missing.', 400);
     }
-    if (typeof ref !== 'string' || !ref.length) {
+    if (!ref) {
       return this.finishProcessWithError('Reference is missing.', 400);
     }
     if (ref.length !== 64) {
@@ -60,9 +60,7 @@ class GetMessages extends Service {
       await this.selectMessagesToSend();
     } catch (error) {
       const errorBody =
-        error.type === 'db'
-          ? [error.message, error.statusCode]
-          : ['There has been a server error', 400];
+        error.type === 'db' ? [error.message, error.statusCode] : ['There has been a server error', 400];
 
       return this.finishProcessWithError(...errorBody);
     }
@@ -77,15 +75,14 @@ class GetMessages extends Service {
     const { login } = this.state.response.locals.tokenData;
     const { originalUrl } = this.state.request;
     const { numberOfMessagesToIgnore, numberOfMessagesToSend } = this.state;
-    const redisKey =
-      login + originalUrl + '/' + numberOfMessagesToSend + '/' + numberOfMessagesToIgnore;
+    const redisKey = login + originalUrl + '/' + numberOfMessagesToSend + '/' + numberOfMessagesToIgnore;
     this.setState({ redisKey });
   };
 
   checkCache = () => {
     const { redisKey } = this.state;
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.redisCache.get(redisKey, (err, data) => {
         if (err || !data) return resolve(this.setState('isCached', false));
         this.setState({ isCached: true, cachedData: JSON.parse(data) });
@@ -110,17 +107,24 @@ class GetMessages extends Service {
   selectMessagesToSend = async () => {
     const { limit, skip, ref } = this.state;
     const { id } = CipheringHandler.decryptData(ref);
-    const { messages, total } = await this.databaseController.getMessages({ id, limit, skip });
+    const { messages, total } = await this.databaseController.getMessages({
+      threadIds: [id],
+      limit,
+      skip,
+    });
     this.setState({ messages, total });
     this.prepareResponse();
   };
 
   prepareResponse = () => {
     const { messages, total } = this.state;
-    const encryptedIdMessages = messages.map(message => {
+    const encryptedIdMessages = messages.map((message) => {
       return {
         ...MessageModel.client(message),
-        ref: CipheringHandler.encryptData({ id: message._id.toString(), type: 'M' }),
+        ref: CipheringHandler.encryptData({
+          id: message._id.toString(),
+          type: 'M',
+        }),
       };
     });
 
@@ -131,10 +135,11 @@ class GetMessages extends Service {
   };
 
   getSentMessagesDetails = () => {
-    const { messages } = this.state;
+    const { messages, total } = this.state;
     return {
-      messagesIds: messages.map(message => message._id),
+      messagesIds: messages.map((message) => message._id),
       threadId: messages[0].thread_id,
+      totalMessageNumber: total,
     };
   };
 

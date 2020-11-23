@@ -43,7 +43,7 @@ class GetThreads extends Service {
   checkCache = () => {
     const { redisKey } = this.state;
 
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.redisCache.get(redisKey, (err, data) => {
         if (err || !data) return resolve(this.setState('isCached', false));
         this.setState({ isCached: true, cachedData: JSON.parse(data) });
@@ -71,17 +71,14 @@ class GetThreads extends Service {
     const numberOfThreadsToSend = requestBody.num;
     const numberOfThreadsToIgnore = requestBody.skip;
 
-    if (typeof numberOfThreadsToSend !== 'string' || !numberOfThreadsToSend.length) {
+    if (!numberOfThreadsToSend) {
       return this.finishProcessWithError('Num parameter is missing.', 400);
     }
-    if (typeof numberOfThreadsToIgnore !== 'string' || !numberOfThreadsToIgnore.length) {
-      return this.finishProcessWithError('Skip parameter is missing.', 400);
-    }
-
-    this.setState({
-      numberOfThreadsToIgnore,
-      numberOfThreadsToSend,
-    });
+    if (!numberOfThreadsToIgnore && numberOfThreadsToIgnore !== 0)
+      this.setState({
+        numberOfThreadsToIgnore,
+        numberOfThreadsToSend,
+      });
   };
 
   getTotalThreadsNumber = async () => {
@@ -92,7 +89,7 @@ class GetThreads extends Service {
     if (numberOfThreadsToIgnore > numberOfThreadsOnServer) {
       return this.finishProcessWithError(
         'Number of threads to skip is greater than total number of threads.',
-        400,
+        400
       );
     }
 
@@ -105,22 +102,28 @@ class GetThreads extends Service {
     const threads = await this.databaseController.getThreads(
       user_id,
       parseInt(numberOfThreadsToSend),
-      parseInt(numberOfThreadsToIgnore),
+      parseInt(numberOfThreadsToIgnore)
     );
 
     this.encryptThreadId(threads);
   };
 
-  encryptThreadId = threads => {
+  encryptThreadId = (threads) => {
     const { numberOfThreadsOnServer } = this.state;
-    const encryptedIdThreads = threads.map(thread => {
+    const encryptedIdThreads = threads.map((thread) => {
       return {
         ...ThreadModel.parse(thread),
-        ref: CipheringHandler.encryptData({ id: thread._id.toString(), type: 'T' }),
+        ref: CipheringHandler.encryptData({
+          id: thread._id.toString(),
+          type: 'T',
+        }),
       };
     });
 
-    this.setState('responseBody', { threads: encryptedIdThreads, total: numberOfThreadsOnServer });
+    this.setState('responseBody', {
+      threads: encryptedIdThreads,
+      total: numberOfThreadsOnServer,
+    });
   };
 
   cacheResponse = () => {

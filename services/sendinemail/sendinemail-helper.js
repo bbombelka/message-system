@@ -15,8 +15,8 @@ class SendInEmailHelper {
     return emailBody;
   }
 
-  static getTextedMessages = messages =>
-    messages.map(message => MessageModel.email(message)).reduce((acc, curr) => acc + curr);
+  static getTextedMessages = (messages) =>
+    messages.map((message) => MessageModel.email(message)).reduce((acc, curr) => acc + curr);
 }
 
 module.exports = SendInEmailHelper;

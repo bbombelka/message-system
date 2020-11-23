@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const bool = require('../enums/boolean');
+const { ObjectId } = require('mongodb');
+
 class ServiceHelper {
   static formatResponse(data) {
     return { status: 'OK', data };
@@ -19,7 +21,7 @@ class ServiceHelper {
   }
 
   static saveDbData(data, dbType) {
-    fs.writeFile(this.getDbFilePath(dbType), JSON.stringify(data), err => {
+    fs.writeFile(this.getDbFilePath(dbType), JSON.stringify(data), (err) => {
       if (err) throw err;
     });
   }
@@ -48,6 +50,10 @@ class ServiceHelper {
 
   static messageIsReply(reply) {
     return reply === bool.TRUE;
+  }
+
+  static convertToObjectId(stringIdArray) {
+    return stringIdArray.map((stringId) => ObjectId(stringId));
   }
 }
 

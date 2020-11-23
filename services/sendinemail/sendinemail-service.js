@@ -6,6 +6,7 @@ const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceEmitter = require('../event-emitter');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const bool = require('../../enums/boolean');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -21,22 +22,22 @@ class NewSendInEmail extends Service {
 
   checkRef = () => {
     const { ref = undefined } = this.state.requestBody;
-
+    const bulk = bool.TRUE === this.state.requestBody.bulk;
     if (!ref) {
       return this.finishProcessWithError('Reference parameter is missing.', 400);
     }
 
-    if (ref.length !== 64) {
+    if (ref.length !== 64 && !bulk) {
       return this.finishProcessWithError('Invalid reference format.', 400);
     }
 
-    this.setState('ref', ref);
+    this.setState('ref', bulk ? ref.split(',') : [ref]);
   };
 
   processRequest = async () => {
     try {
       this.decodeRef();
-      if (!ServiceHelper.itemIsThread(this.state.type)) {
+      if (!this.areOnlyThreads()) {
         return this.finishProcessWithError('Invalid reference', 400);
       }
       await this.getThreadMessages();
@@ -49,13 +50,19 @@ class NewSendInEmail extends Service {
 
   decodeRef = () => {
     const { ref } = this.state;
-    const { id, type } = CipheringHandler.decryptData(ref);
-    this.setState({ id, type });
+    const decryptedItems = ref.map((ref) => CipheringHandler.decryptData(ref));
+    this.setState({ decryptedItems });
+  };
+
+  areOnlyThreads = () => {
+    return this.state.decryptedItems.every(({ type }) => ServiceHelper.itemIsThread(type));
   };
 
   getThreadMessages = async () => {
-    const { id } = this.state;
-    const { messages } = await this.databaseController.getMessages({ id });
+    const { decryptedItems } = this.state;
+    const threadIds = decryptedItems.map(({ id }) => id);
+
+    const { messages } = await this.databaseController.getMessages({ threadIds });
     this.setState({ messages });
   };
 
@@ -79,7 +86,7 @@ class NewSendInEmail extends Service {
       });
       const emailOptions = await transporter.sendMail({
         from: 'hollis8@ethereal.email',
-        to: 'bardelik@o2.pl',
+        to: 'b.bombelka@gmail.com',
         subject: 'Wiadomości z wątku',
         html: emailContent,
       });
@@ -94,7 +101,7 @@ class NewSendInEmail extends Service {
     }
   };
 
-  prepareResponse = responseInfo => {
+  prepareResponse = (responseInfo) => {
     const url = nodemailer.getTestMessageUrl(responseInfo);
     this.setState('responseBody', { url });
     this.emitEvent('processing-finished');

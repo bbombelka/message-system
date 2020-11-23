@@ -6,6 +6,7 @@ const CipheringHandler = require('../../common/ciphering-handler');
 const Helper = require('../service-helper');
 const redisClient = require('../redis');
 const config = require('../../config');
+const bool = require('../../enums/boolean');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -22,26 +23,24 @@ class DeleteItem extends Service {
 
   checkParameters = () => {
     const { ref = undefined } = this.state.requestBody;
+    const bulk = bool.TRUE === this.state.requestBody.bulk;
     if (!ref) {
       return this.finishProcessWithError('Reference parameter is missing.', 400);
     }
-    if (ref.length !== 64) {
+
+    if (ref.length !== 64 && !bulk) {
       return this.finishProcessWithError('Invalid reference format.', 400);
     }
-    this.setState({ ref });
+
+    this.setState('ref', bulk ? ref.split(',') : [ref]);
   };
 
   processRequest = async () => {
     try {
-      const { ref } = this.state;
       !config.cacheIsDisabled && (await this.clearCache());
-      const { id, type } = CipheringHandler.decryptData(ref);
-
-      if (Helper.itemIsThread(type)) {
-        await this.deleteThread(id);
-      } else {
-        await this.deleteMessage(id);
-      }
+      this.decodeRef();
+      this.checkRefContent();
+      await Promise.all(this.getRequests());
       this.emitEvent('processing-finished');
     } catch (error) {
       const errorBody = Helper.isDatabaseError(error)
@@ -52,25 +51,55 @@ class DeleteItem extends Service {
     }
   };
 
+  decodeRef = () => {
+    const { ref } = this.state;
+    const decryptedItems = ref.map((ref) => CipheringHandler.decryptData(ref));
+    this.setState({ decryptedItems });
+  };
+
+  checkRefContent = () => {
+    const { decryptedItems } = this.state;
+    const threadsToDelete = decryptedItems.filter(({ type }) => Helper.itemIsThread(type));
+    const messagesToDelete = decryptedItems.filter(({ type }) => Helper.itemIsMessage(type));
+
+    this.setState({
+      threadsToDelete: threadsToDelete.length ? threadsToDelete.map(({ id }) => id) : null,
+      messagesToDelete: messagesToDelete.length ? messagesToDelete.map(({ id }) => id) : null,
+    });
+  };
+
+  getRequests = () => {
+    const { threadsToDelete, messagesToDelete } = this.state;
+
+    return [
+      threadsToDelete ? this.deleteThread(threadsToDelete) : Promise.resolve(),
+      messagesToDelete ? this.deleteMessage(messagesToDelete) : Promise.resolve(),
+    ];
+  };
+
   deleteThread = async (id, options) => {
-    await this.databaseController.deleteThread(id, options);
-    const threadsLeft = await this.databaseController.getThreadNumber();
+    const user_id = this.state.response.locals.tokenData._id;
+    const objectIds = Helper.convertToObjectId(id);
+    await this.databaseController.deleteThread(objectIds, options);
+    const threadsLeft = await this.databaseController.getThreadNumber(user_id);
     this.prepareResponse(threadsLeft);
   };
 
-  prepareResponse = total => {
+  prepareResponse = (total) => {
     const { ref } = this.state;
+
     this.setState('responseBody', {
-      ref,
+      ref: ref.join(','),
       total,
     });
   };
 
-  deleteMessage = async id => {
-    const threadId = await this.databaseController.deleteMessage(id);
+  deleteMessage = async (id) => {
+    const objectIds = Helper.convertToObjectId(id);
+    const threadId = await this.databaseController.deleteMessage(objectIds);
     const messagesLeft = await this.databaseController.getMessageNumber(threadId);
     if (messagesLeft === 0) {
-      this.deleteThread(threadId, { lastMessageDeleted: true });
+      this.deleteThread([threadId], { lastMessageDeleted: true });
     }
     this.prepareResponse(messagesLeft);
   };
@@ -79,6 +108,7 @@ class DeleteItem extends Service {
     return new Promise((resolve, reject) => {
       resolve(this.redisCache);
       // Clearin cache is tricky on windows platform as redis works only in legacy version . . .
+      // need to get back to that now :-)
     });
   };
 }

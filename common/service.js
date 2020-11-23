@@ -42,7 +42,7 @@ class Service {
     }
   };
 
-  setValidation = validationList => {
+  setValidation = (validationList) => {
     const validations = Array.isArray(validationList) ? validationList : [validationList];
     this.state.options.validationList.push(...validations);
   };
@@ -52,7 +52,7 @@ class Service {
     !error && this.emitEvent('processing-started');
   };
 
-  emitEvent = eventName => {
+  emitEvent = (eventName) => {
     const { prefix } = this.state.options;
     const event = `${prefix}-${eventName}`;
     this.serviceEmitter.emit(event);
@@ -67,7 +67,10 @@ class Service {
     if (value === undefined && typeof prop === 'object' && !isNull(prop) && !Array.isArray(prop)) {
       this.state = { ...this.state, ...prop };
     } else if (typeof prop === 'string' && value !== undefined) {
-      const propToSet = Object.defineProperty({}, prop, { value, enumerable: true });
+      const propToSet = Object.defineProperty({}, prop, {
+        value,
+        enumerable: true,
+      });
       this.state = { ...this.state, ...propToSet };
     } else throw Error('Invalid argument(s). Use either key-value pair or provide an object.');
   };
@@ -84,10 +87,10 @@ class Service {
       : this.setState('requestBody', body);
   };
 
-  validateBodyContent = validatingFunc => {
+  validateBodyContent = (validatingFunc) => {
     validatingFunc ? this.onSuccessfulValidation() : this.onFailedValidation();
   };
-  onSuccesfulValidation = requestProcess => requestProcess();
+  onSuccesfulValidation = (requestProcess) => requestProcess();
 
   finishProcessWithError = (errorMessage, statusCode = 404) => {
     this.setState({

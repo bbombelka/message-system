@@ -35,7 +35,6 @@ class GetAttachment extends Service {
   };
 
   processRequest = async () => {
-    const { response } = this.state;
     try {
       this.decodeRef();
       this.state.getAllAttachments
@@ -47,10 +46,10 @@ class GetAttachment extends Service {
     }
   };
 
-  getErrorMessage = error => {
+  getErrorMessage = (error) => {
     return ServiceHelper.isDatabaseError(error)
       ? [error.message, error.statusCode]
-      : ['There were problems with deleting the file.', 400];
+      : ['There were problems with downloading the file.', 400];
   };
 
   decodeRef = () => {
@@ -69,6 +68,7 @@ class GetAttachment extends Service {
 
   processAllAttachments = async () => {
     const { id } = this.state;
+
     const attachmentsDetails = await this.databaseController.getAllAttachments(id);
     const attachmentsBinaries = await this.databaseController.getAllAttachmentsBinaries(id);
     this.getDecipheredAttachmentsDetails(attachmentsDetails);
@@ -78,22 +78,22 @@ class GetAttachment extends Service {
     this.sendFile();
   };
 
-  getDecipheredAttachmentsDetails = attachmentsDetails => {
-    const deciphered = attachmentsDetails.map(attachmentDetails => {
+  getDecipheredAttachmentsDetails = (attachmentsDetails) => {
+    const deciphered = attachmentsDetails.map((attachmentDetails) => {
       return { ...attachmentDetails, id: CipheringHandler.decryptData(attachmentDetails.ref).id };
     });
 
     this.setState('decipheredAttachmentDetails', deciphered);
   };
 
-  mergeDetails = attachmentsBinaries => {
+  mergeDetails = (attachmentsBinaries) => {
     const { decipheredAttachmentDetails } = this.state;
-    const ids = decipheredAttachmentDetails.map(detail => detail.id);
+    const ids = decipheredAttachmentDetails.map((detail) => detail.id);
     const checkedBinaryAttachments = attachmentsBinaries.filter(({ _id }) =>
-      ids.includes(_id.toString()),
+      ids.includes(_id.toString())
     );
-    [checkedBinaryAttachments, decipheredAttachmentDetails].forEach(details =>
-      details.sort((a, b) => Number(a.id) - Number(b.id)),
+    [checkedBinaryAttachments, decipheredAttachmentDetails].forEach((details) =>
+      details.sort((a, b) => Number(a.id) - Number(b.id))
     );
     const completeAttachmentDetails = decipheredAttachmentDetails.map(({ name }, index) => {
       return {
@@ -115,7 +115,7 @@ class GetAttachment extends Service {
     this.setState({ attachmentsDirPath });
   };
 
-  createDir = async dirPath => {
+  createDir = async (dirPath) => {
     await fs.promises.mkdir(dirPath);
   };
 
@@ -127,7 +127,7 @@ class GetAttachment extends Service {
 
     await new Promise((resolve, reject) => {
       this.appendFilesBufferToArchive(archive);
-      archive.on('error', err => reject(err)).pipe(output);
+      archive.on('error', (err) => reject(err)).pipe(output);
       output.on('close', () => resolve());
       archive.finalize();
     });
@@ -135,7 +135,7 @@ class GetAttachment extends Service {
     this.setState('downloadPath', archivePath);
   };
 
-  appendFilesBufferToArchive = archive => {
+  appendFilesBufferToArchive = (archive) => {
     const { completeAttachmentDetails } = this.state;
     completeAttachmentDetails.forEach(({ buffer, name }) => {
       archive.append(buffer, { name });
@@ -171,13 +171,13 @@ class GetAttachment extends Service {
   };
 
   getCacheDirPath = () => {
-    const login = 'barty-boy'; // :-)
+    const login = 'barty-boy'; // :-) need to get back to this !
     return path.join('file-cache', login);
   };
 
   saveToFile = (filePath, binaryBuffer) => {
     return new Promise((resolve, reject) => {
-      fs.writeFile(filePath, binaryBuffer, err => {
+      fs.writeFile(filePath, binaryBuffer, (err) => {
         if (err) reject();
         this.setState('downloadPath', filePath);
         resolve();
@@ -185,7 +185,7 @@ class GetAttachment extends Service {
     });
   };
 
-  prepareUserCacheDirectory = async dirPath => {
+  prepareUserCacheDirectory = async (dirPath) => {
     const dirExists = await this.checkDirExistence(dirPath);
     if (!dirExists) {
       await this.createDir(dirPath);
@@ -193,7 +193,7 @@ class GetAttachment extends Service {
     this.setState({ dirPath });
   };
 
-  checkDirExistence = async dirPath => {
+  checkDirExistence = async (dirPath) => {
     try {
       const lstat = await fs.promises.lstat(dirPath);
       return lstat.isDirectory();
@@ -205,7 +205,7 @@ class GetAttachment extends Service {
   sendFile = () => {
     const { response, downloadPath } = this.state;
 
-    response.download(downloadPath, err => {
+    response.download(downloadPath, (err) => {
       if (err) throw new Error('There were problems with downloading the file.');
     });
   };
