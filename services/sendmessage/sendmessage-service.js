@@ -22,12 +22,7 @@ class DeleteItem extends Service {
   }
 
   checkParameters = () => {
-    const {
-      reply = undefined,
-      ref = undefined,
-      title = undefined,
-      text = undefined,
-    } = this.state.requestBody;
+    const { reply = undefined, ref = undefined, title = undefined, text = undefined } = this.state.requestBody;
 
     if (!reply) {
       return this.finishProcessWithError('Reply parameter is missing.', 400);
@@ -84,16 +79,19 @@ class DeleteItem extends Service {
     }
   };
 
-  addMessageToExistingThread = async ({ id, type }) => {
+  addMessageToExistingThread = async ({ id, type }, insertedThread) => {
     if (!Helper.itemIsThread(type)) {
       return this.finishProcessWithError('Invalid reference.', 400);
     }
     const message = this.getMessageBody(id);
-    const newMessageId = await this.databaseController.addToCollection(message, 'messages');
-    this.prepareResponse(newMessageId);
+    const insertedMessage = await this.databaseController.addToCollection(message, 'messages');
+
+    const insertedItems = [insertedThread, insertedMessage].filter((item) => item);
+
+    this.prepareResponse(insertedItems);
   };
 
-  getMessageBody = threadId => {
+  getMessageBody = (threadId) => {
     const { text, title } = this.state;
     const user_id = this.state.response.locals.tokenData._id;
     const _id = new ObjectId();
@@ -109,16 +107,38 @@ class DeleteItem extends Service {
     return messageModel.database(messageParams);
   };
 
-  prepareResponse = id => {
-    this.setState('responseBody', {
-      ref: CipheringHandler.encryptData({ id: id.toString(), type: 'M' }),
+  prepareResponse = (insertedItems) => {
+    const response = insertedItems.map((item) => {
+      const isMessage = Boolean(item.thread_id);
+
+      return isMessage
+        ? {
+            messages: [
+              messageModel.client({
+                ...item,
+                ref: CipheringHandler.encryptData({ id: item._id.toString(), type: 'M' }),
+              }),
+            ],
+          }
+        : {
+            threads: [
+              threadModel.parse({
+                ...item,
+                ref: CipheringHandler.encryptData({ id: item._id.toString(), type: 'T' }),
+              }),
+            ],
+          };
     });
+
+    const responseBody = response.length === 2 ? { ...response[0], ...response[1] } : { ...response[0] };
+
+    this.setState({ responseBody });
   };
 
   startNewThread = async () => {
     const thread = this.getThreadBody();
-    const newThreadId = await this.databaseController.addToCollection(thread, 'threads');
-    await this.addMessageToExistingThread({ id: newThreadId.toString(), type: 'T' });
+    const insertedThread = await this.databaseController.addToCollection(thread, 'threads');
+    await this.addMessageToExistingThread({ id: insertedThread._id.toString(), type: 'T' }, insertedThread);
   };
 
   getThreadBody = () => {

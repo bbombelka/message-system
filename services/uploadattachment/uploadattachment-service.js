@@ -17,11 +17,7 @@ class UploadAttachment extends Service {
     super(serviceEmitter, databaseController);
     this.setState('options', { ...this.state.options, prefix });
     this.attachListeners();
-    this.setValidation([
-      'validateRequestHasFiles',
-      'validateMessageRef',
-      'validateRequestFileContent',
-    ]);
+    this.setValidation(['validateRequestHasFiles', 'validateMessageRef', 'validateRequestFileContent']);
   }
 
   validateRequestHasFiles = () => {
@@ -56,8 +52,8 @@ class UploadAttachment extends Service {
     }
 
     files.forEach((file, index) => {
-      const { name, mimetype, size, md5 } = file;
-      const responseObject = Helper.createResponseObject(md5, name);
+      const { name, mimetype, size } = file;
+      const responseObject = Helper.createResponseObject(file);
 
       if (size > uploadEnum.MAXIMUM_FILE_SIZE) {
         const error = `${name} is too big. Maximum size is ${uploadEnum.MAXIMUM_FILE_SIZE} bytes per file.`;
@@ -90,8 +86,8 @@ class UploadAttachment extends Service {
   };
 
   #getUploadedFiles = () => {
-    const { attachment } = this.state.request.files;
-    return Array.isArray(attachment) ? attachment : [attachment];
+    const { file } = this.state.request.files;
+    return Array.isArray(file) ? file : [file];
   };
 
   processRequest = async () => {
@@ -119,7 +115,7 @@ class UploadAttachment extends Service {
         await this.databaseController.addAttachmentBinary(attachmentDocument);
       } catch (error) {
         const errorMessage = this.getErrorMessage(error);
-        const responseObject = responseInfo.find(response => response.md5 === file.md5);
+        const responseObject = responseInfo.find((response) => response.md5 === file.md5);
         const options = { status: uploadEnum.ERROR_RESPONSE, msg: errorMessage };
         Helper.updateResponseObject(responseObject, options);
       }
@@ -127,10 +123,8 @@ class UploadAttachment extends Service {
     this.setState({ responseInfo });
   };
 
-  getErrorMessage = error => {
-    return ServiceHelper.isDatabaseError(error)
-      ? error.message
-      : 'There were problems with saving the file.';
+  getErrorMessage = (error) => {
+    return ServiceHelper.isDatabaseError(error) ? error.message : 'There were problems with saving the file.';
   };
 
   createAttachmentDocument = (_id, fileContentBuffer) => {
@@ -150,22 +144,20 @@ class UploadAttachment extends Service {
 
   prepareResponseMessage = () => {
     const { responseInfo } = this.state;
-    const responseBody = responseInfo.map(({ status, name, msg }) => {
-      return {
-        status,
-        name,
-        msg,
-      };
-    });
+    const responseBody = responseInfo.map(({ status, name, mimetype, msg, size }) => ({
+      status,
+      mimetype,
+      msg,
+      name,
+      size,
+    }));
 
     this.setState({ responseBody });
   };
 
   verifyErrorState = () => {
     const { responseBody } = this.state;
-    const allFilesAreErroneus = responseBody.every(
-      responseInfo => responseInfo.status === uploadEnum.ERROR_RESPONSE,
-    );
+    const allFilesAreErroneus = responseBody.every((responseInfo) => responseInfo.status === uploadEnum.ERROR_RESPONSE);
     if (allFilesAreErroneus) this.setState({ error: true, statusCode: 400 });
   };
 }

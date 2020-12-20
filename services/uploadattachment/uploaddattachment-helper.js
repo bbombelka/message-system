@@ -1,8 +1,9 @@
 const uploadEnum = require('../../enums/upload');
 
 class UploadattachmentHelper {
-  static createResponseObject(md5, name) {
-    return { md5, status: uploadEnum.SUCCESSFUL_RESPONSE, name, msg: [] };
+  static createResponseObject(file) {
+    const { md5, mimetype, name, size } = file;
+    return { md5, mimetype, msg: [], name, size, status: uploadEnum.SUCCESSFUL_RESPONSE };
   }
 
   static updateResponseObject(responseObj, { status, msg }) {

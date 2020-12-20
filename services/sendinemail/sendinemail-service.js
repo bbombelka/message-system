@@ -7,6 +7,7 @@ const ServiceEmitter = require('../event-emitter');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const bool = require('../../enums/boolean');
+const Helper = require('../service-helper');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -44,7 +45,11 @@ class NewSendInEmail extends Service {
       this.createEmailContent();
       this.sendEmail();
     } catch (error) {
-      this.finishProcessWithError('There has been a server error.', 500);
+      const errorBody = Helper.isDatabaseError(error)
+        ? [error.message, error.statusCode]
+        : ['There has been a server error', 500];
+
+      this.finishProcessWithError(...errorBody);
     }
   };
 

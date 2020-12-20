@@ -121,7 +121,7 @@ class DatabaseController extends EventEmitter {
   getThreads = async (user_id, limit, skip) => {
     await this.#connectMongoClient();
     const threadsCollection = this.#getCollection('threads');
-    const threads = await threadsCollection.find({ user_id }, { limit, skip }).toArray();
+    const threads = await threadsCollection.find({ user_id }, { limit, skip }).sort({ date: -1 }).toArray();
     this.#closeMongoClient();
     return threads;
   };
@@ -148,7 +148,7 @@ class DatabaseController extends EventEmitter {
     } else if (skip >= totalMessages) {
       this.#throwError(dbError.WRONG_SKIP, 422);
     }
-    const messages = await cursor.limit(limit).skip(skip).toArray();
+    const messages = await cursor.limit(limit).skip(skip).sort({ date: -1 }).toArray();
     this.#closeMongoClient();
     return { messages, total: totalMessages };
   };
@@ -210,21 +210,24 @@ class DatabaseController extends EventEmitter {
   addToCollection = async (item, collectionName) => {
     await this.#connectMongoClient();
     const itemCollection = this.#getCollection(collectionName);
-    const { insertedCount, insertedId } = await itemCollection.insertOne(item);
+    const { insertedCount, ops } = await itemCollection.insertOne(item);
+    const insertedItem = ops[0];
+
     if (insertedCount === 0) {
       this.#throwError('Item has not been persisted to the database.', 500);
     }
-    if (insertedId !== item._id) {
+    if (insertedItem._id !== item._id) {
       await itemCollection.deleteOne({ _id: insertedId });
       this.#throwError('Item has not been persisted to the database.', 500);
     }
+
     this.#closeMongoClient();
 
     if (collectionName === 'messages') {
       this.emit('message-added', item.thread_id);
     }
 
-    return insertedId;
+    return insertedItem;
   };
 
   addAttachmentBinary = async (attachmentDocument) => {
@@ -331,7 +334,7 @@ class DatabaseController extends EventEmitter {
   };
 
   deleteAttachmentBinary = async (id) => {
-    this.#connectMongoClient();
+    await this.#connectMongoClient();
     const attachmentCollection = this.#getCollection('attachments');
     const { value } = await attachmentCollection.findOneAndDelete({ _id: ObjectId(id) });
     this.#closeMongoClient();
@@ -342,7 +345,7 @@ class DatabaseController extends EventEmitter {
   };
 
   deleteAttachmentDetails = async (id, ref) => {
-    this.#connectMongoClient();
+    await this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
     const { matchedCount, modifiedCount } = await messagesCollection.updateOne(
       { _id: ObjectId(id) },
@@ -359,7 +362,7 @@ class DatabaseController extends EventEmitter {
   };
 
   updateMessage = async (id, text) => {
-    this.#connectMongoClient();
+    await this.#connectMongoClient();
     const messagesCollection = this.#getCollection('messages');
     const cursor = messagesCollection.find({ _id: ObjectId(id) });
 
@@ -367,22 +370,23 @@ class DatabaseController extends EventEmitter {
       this.#throwError(dbError.MESSAGE_NOT_FOUND, 404);
     }
 
-    if (!(await cursor.filter({ processed: 'N' }).hasNext())) {
-      this.#throwError(dbError.MESSAGE_NO_EDIT, 400);
+    if (!(await cursor.filter({ processed: 'F' }).hasNext())) {
+      this.#throwError(dbError.MESSAGE__NO_EDIT, 400);
     }
     cursor.close();
 
-    const { modifiedCount } = await messagesCollection.updateOne({ _id: ObjectId(id) }, { $set: { text } });
+    const { value } = await messagesCollection.findOneAndUpdate(
+      { _id: ObjectId(id) },
+      { $set: { lastUpdated: new Date(), text } },
+      { returnOriginal: false }
+    );
 
-    if (modifiedCount === 0) {
+    if (value === null) {
       this.#throwError(dbError.MESSAGE_NOT_UPDATED, 500);
     }
 
-    const lastUpdated = new Date();
-    messagesCollection.updateOne({ _id: ObjectId(id) }, { $set: { lastUpdated } });
-
     this.#closeMongoClient();
-    return lastUpdated;
+    return value;
   };
 
   getUser = async (login) => {

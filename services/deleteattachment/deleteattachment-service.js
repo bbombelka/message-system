@@ -42,7 +42,7 @@ class DeleteAttachment extends Service {
     }
   };
 
-  getErrorMessage = error => {
+  getErrorMessage = (error) => {
     return ServiceHelper.isDatabaseError(error)
       ? [error.message, error.statusCode]
       : ['There were problems with deleting the file.', 400];

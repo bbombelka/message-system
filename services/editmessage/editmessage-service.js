@@ -4,6 +4,7 @@ const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceHelper = require('../service-helper');
+const messageModel = require('../../models/message-model');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -66,20 +67,21 @@ class EditMessage extends Service {
 
   updateDatabase = async () => {
     const { id, text } = this.state;
-    const updatedOn = await this.databaseController.updateMessage(id, text);
+    const editedMessage = await this.databaseController.updateMessage(id, text);
 
-    this.setState({ updatedOn });
+    this.setState({ editedMessage });
   };
 
-  getErrorMessage = error => {
+  getErrorMessage = (error) => {
     return ServiceHelper.isDatabaseError(error)
       ? [error.message, error.statusCode]
       : ['There were problems with updating the message.', 400];
   };
 
   prepareResponse = () => {
-    const { ref, updatedOn } = this.state;
-    this.setState('responseBody', { ref, updatedOn });
+    const { editedMessage, ref } = this.state;
+
+    this.setState('responseBody', { messages: [messageModel.client({ ...editedMessage, ref })] });
   };
 }
 

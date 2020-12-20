@@ -2,6 +2,7 @@ const bool = require('../enums/boolean');
 
 module.exports = {
   parse: ({ ref, title, cd, date, nummess, unreadmess, type, read }) => {
+    //ujednolicić z client w message model
     return {
       ref,
       title,
