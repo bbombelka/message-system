@@ -8,6 +8,7 @@ const messageModel = require('../../models/message-model');
 const Helper = require('../service-helper');
 const threadModel = require('../../models/thread-model');
 const bool = require('../../enums/boolean');
+const { PROCESSING_FINISHED, MESSAGE_MODIFIED, THREAD_MODIFIED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -59,9 +60,9 @@ class DeleteItem extends Service {
   };
 
   processRequest = async () => {
-    const { reply } = this.state;
+    this.setState({ isReply: Helper.messageIsReply(this.state.reply) });
     try {
-      if (Helper.messageIsReply(reply)) {
+      if (this.state.isReply) {
         const { ref } = this.state;
         const { id, type } = CipheringHandler.decryptData(ref);
         await this.addMessageToExistingThread({ id, type });
@@ -69,13 +70,14 @@ class DeleteItem extends Service {
         await this.startNewThread();
       }
     } catch (error) {
+      console.log(error);
       const errorBody = Helper.isDatabaseError(error)
         ? [error.message, error.statusCode]
         : ['There has been a server error', 500];
 
       this.finishProcessWithError(...errorBody);
     } finally {
-      this.emitEvent('processing-finished');
+      this.emitEvent(PROCESSING_FINISHED);
     }
   };
 
@@ -85,10 +87,16 @@ class DeleteItem extends Service {
     }
     const message = this.getMessageBody(id);
     const insertedMessage = await this.databaseController.addToCollection(message, 'messages');
-
     const insertedItems = [insertedThread, insertedMessage].filter((item) => item);
 
     this.prepareResponse(insertedItems);
+
+    if (this.state.isReply) {
+      this.databaseController.emit(MESSAGE_MODIFIED, {
+        user_id: this.state.response.locals.tokenData._id,
+        ref: this.state.ref,
+      });
+    }
   };
 
   getMessageBody = (threadId) => {
@@ -138,6 +146,7 @@ class DeleteItem extends Service {
   startNewThread = async () => {
     const thread = this.getThreadBody();
     const insertedThread = await this.databaseController.addToCollection(thread, 'threads');
+    this.databaseController.emit(THREAD_MODIFIED, this.state.response.locals.tokenData._id);
     await this.addMessageToExistingThread({ id: insertedThread._id.toString(), type: 'T' }, insertedThread);
   };
 

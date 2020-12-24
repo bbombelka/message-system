@@ -6,6 +6,7 @@ const CipheringHandler = require('../../common/ciphering-handler');
 const ThreadModel = require('../../models/thread-model');
 const redisClient = require('../redis');
 const config = require('../../config');
+const { PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -34,7 +35,7 @@ class GetThreads extends Service {
         await this.selectThreadsToSend();
         !config.cacheIsDisabled && this.cacheResponse();
       }
-      this.emitEvent('processing-finished');
+      this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
       this.finishProcessWithError('There has been a server error', 400);
     }
@@ -53,17 +54,20 @@ class GetThreads extends Service {
   };
 
   getRedisKey = () => {
-    const { login } = this.state.response.locals.tokenData;
-    const { originalUrl } = this.state.request;
     const { numberOfThreadsToIgnore, numberOfThreadsToSend } = this.state;
-    const redisKey =
-      login + originalUrl + '/' + numberOfThreadsToSend + '/' + numberOfThreadsToIgnore;
+    const parts = [
+      this.state.response.locals.tokenData._id,
+      this.state.request.originalUrl.slice(1),
+      numberOfThreadsToSend,
+      numberOfThreadsToIgnore,
+    ];
+    const redisKey = this.generateRedisKey(parts);
     this.setState({ redisKey });
   };
 
   respondWithCachedData = () => {
     this.setState('responseBody', this.state.cachedData);
-    this.emitEvent('processing-finished');
+    this.emitEvent(PROCESSING_FINISHED);
   };
 
   prepareParameters = () => {
@@ -74,11 +78,8 @@ class GetThreads extends Service {
     if (!numberOfThreadsToSend) {
       return this.finishProcessWithError('Num parameter is missing.', 400);
     }
-    if (!numberOfThreadsToIgnore && numberOfThreadsToIgnore !== 0)
-      this.setState({
-        numberOfThreadsToIgnore,
-        numberOfThreadsToSend,
-      });
+
+    this.setState({ numberOfThreadsToIgnore, numberOfThreadsToSend });
   };
 
   getTotalThreadsNumber = async () => {
@@ -87,10 +88,7 @@ class GetThreads extends Service {
     const { numberOfThreadsToIgnore } = this.state;
 
     if (numberOfThreadsToIgnore > numberOfThreadsOnServer) {
-      return this.finishProcessWithError(
-        'Number of threads to skip is greater than total number of threads.',
-        400
-      );
+      return this.finishProcessWithError('Number of threads to skip is greater than total number of threads.', 400);
     }
 
     this.setState({ numberOfThreadsOnServer });

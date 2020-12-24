@@ -37,7 +37,6 @@ class DeleteItem extends Service {
 
   processRequest = async () => {
     try {
-      !config.cacheIsDisabled && (await this.clearCache());
       this.decodeRef();
       this.checkRefContent();
       await Promise.all(this.getRequests());
@@ -80,7 +79,7 @@ class DeleteItem extends Service {
   deleteThread = async (id, options) => {
     const user_id = this.state.response.locals.tokenData._id;
     const objectIds = Helper.convertToObjectId(id);
-    await this.databaseController.deleteThread(objectIds, options);
+    await this.databaseController.deleteThread(objectIds, options, user_id);
     const threadsLeft = await this.databaseController.getThreadNumber(user_id);
     this.prepareResponse(threadsLeft);
   };
@@ -102,14 +101,6 @@ class DeleteItem extends Service {
       this.deleteThread([threadId], { lastMessageDeleted: true });
     }
     this.prepareResponse(messagesLeft);
-  };
-
-  clearCache = () => {
-    return new Promise((resolve, reject) => {
-      resolve(this.redisCache);
-      // Clearin cache is tricky on windows platform as redis works only in legacy version . . .
-      // need to get back to that now :-)
-    });
   };
 }
 

@@ -4,7 +4,8 @@
   "description": "Messages System",
   "main": "index.js",
   "scripts": {
-    "start": "npx nodemon index.js"
+    "start": "npx nodemon index.js",
+    "log": "npx nodemon index.js logger"
   },
   "nodemonConfig": {
     "ignore": [

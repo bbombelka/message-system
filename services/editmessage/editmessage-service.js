@@ -5,6 +5,7 @@ const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceHelper = require('../service-helper');
 const messageModel = require('../../models/message-model');
+const { MESSAGE_MODIFIED, PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -48,7 +49,7 @@ class EditMessage extends Service {
       this.decodeRef();
       await this.updateDatabase();
       this.prepareResponse();
-      this.emitEvent('processing-finished');
+      this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
       const errorMessage = this.getErrorMessage(error);
       this.finishProcessWithError(...errorMessage);
@@ -68,7 +69,10 @@ class EditMessage extends Service {
   updateDatabase = async () => {
     const { id, text } = this.state;
     const editedMessage = await this.databaseController.updateMessage(id, text);
-
+    this.databaseController.emit(MESSAGE_MODIFIED, {
+      user_id: this.state.response.locals.tokenData._id,
+      ref: CipheringHandler.encryptData({ id: editedMessage.thread_id, type: 'T' }),
+    });
     this.setState({ editedMessage });
   };
 

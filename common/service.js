@@ -1,6 +1,7 @@
 const isNull = require('../utils/isNull');
 const ServiceHelper = require('../services/service-helper');
 const DatabaseError = require('../database/database-error');
+const { PROCESSING_FINISHED, PROCESSING_STARTED } = require('../enums/events.enum');
 
 class Service {
   constructor(serviceEmitter, databaseController) {
@@ -10,8 +11,8 @@ class Service {
       options: {
         prefix: 'service',
         eventListeners: [
-          ['-processing-finished', () => this.sendResponse()],
-          ['-processing-started', () => this.processRequest()],
+          ['-' + PROCESSING_FINISHED, () => this.sendResponse()],
+          ['-' + PROCESSING_STARTED, () => this.processRequest()],
         ],
         validationList: ['validateRequestHasBody'],
       },
@@ -49,7 +50,7 @@ class Service {
 
   checkValidationStatus = () => {
     const { error } = this.state;
-    !error && this.emitEvent('processing-started');
+    !error && this.emitEvent(PROCESSING_STARTED);
   };
 
   emitEvent = (eventName) => {
@@ -98,7 +99,7 @@ class Service {
       responseBody: errorMessage,
       error: true,
     });
-    this.emitEvent('processing-finished');
+    this.emitEvent(PROCESSING_FINISHED);
   };
 
   sendResponse = () => {
@@ -110,6 +111,10 @@ class Service {
 
   throwError = (errorMessage, statusCode) => {
     throw new DatabaseError(errorMessage, statusCode);
+  };
+
+  generateRedisKey = (parts) => {
+    return parts.reduce((acc, curr) => acc + '/' + curr);
   };
 }
 

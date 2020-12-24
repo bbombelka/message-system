@@ -7,6 +7,7 @@ const CipheringHandler = require('../../common/ciphering-handler');
 const Helper = require('./getmessages-helper');
 const redisClient = require('../redis');
 const config = require('../../config');
+const { MESSAGES_SENT, PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -65,17 +66,22 @@ class GetMessages extends Service {
       return this.finishProcessWithError(...errorBody);
     }
     !config.cacheIsDisabled && this.cacheResponse();
-    this.emitEvent('processing-finished');
+    this.emitEvent(PROCESSING_FINISHED);
     if (Helper.payloadHasUnreadMessages(this.state.messages)) {
-      this.databaseController.emit('messages-sent', this.getSentMessagesDetails());
+      this.databaseController.emit(MESSAGES_SENT, this.getSentMessagesDetails());
     }
   };
 
   getRedisKey = () => {
-    const { login } = this.state.response.locals.tokenData;
-    const { originalUrl } = this.state.request;
     const { numberOfMessagesToIgnore, numberOfMessagesToSend } = this.state;
-    const redisKey = login + originalUrl + '/' + numberOfMessagesToSend + '/' + numberOfMessagesToIgnore;
+    const keyParts = [
+      this.state.response.locals.tokenData._id,
+      this.state.request.originalUrl.slice(1),
+      this.state.requestBody.ref,
+      numberOfMessagesToSend,
+      numberOfMessagesToIgnore,
+    ];
+    const redisKey = this.generateRedisKey(keyParts);
     this.setState({ redisKey });
   };
 
@@ -93,7 +99,7 @@ class GetMessages extends Service {
 
   respondWithCachedData = () => {
     this.setState('responseBody', this.state.cachedData);
-    this.emitEvent('processing-finished');
+    this.emitEvent(PROCESSING_FINISHED);
   };
 
   getParamsForSelectingResponseBodyMessages = () => {

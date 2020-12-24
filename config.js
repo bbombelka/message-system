@@ -1,9 +1,9 @@
 module.exports = {
   logStorageTimeInDays: 10,
-  cacheIsDisabled: true,
-  cacheExpiration: 10, // seconds
+  cacheIsDisabled: false,
+  cacheExpiration: 60 * 10, // seconds
   accessTokenExpirationTime: 150 * 60, // seconds
-  refreshTokenExpirationTime: '24h',
+  refreshTokenExpirationTime: '1h',
   tokenSecretPath: './jwt.json',
   dbUriPath: './db.json',
 };

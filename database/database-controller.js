@@ -4,6 +4,14 @@ const DatabaseError = require('./database-error');
 const dbError = require('../enums/db-errors');
 const EventEmitter = require('events');
 const bool = require('../enums/boolean');
+const redisClient = require('../services/redis');
+const {
+  MESSAGE_ADDED,
+  MESSAGE_DELETED,
+  MESSAGE_MODIFIED,
+  MESSAGES_SENT,
+  THREAD_MODIFIED,
+} = require('../enums/events.enum');
 
 class DatabaseController extends EventEmitter {
   constructor() {
@@ -11,10 +19,21 @@ class DatabaseController extends EventEmitter {
     this.#attachListeners();
   }
 
+  #adjustCache = ({ event, data }) => {
+    const { user_id, ref } = data;
+    const pattern = event === THREAD_MODIFIED ? `${user_id}/getthreads*` : `${user_id}/getmessages/${ref}/*`;
+
+    redisClient.scan('0', 'MATCH', pattern, 'COUNT', '100', (err, [_, keys]) => {
+      keys.forEach((key) => redisClient.del(key, (err, number) => console.log(err, number)));
+    });
+  };
+
   #attachListeners = () => {
-    this.on('message-added', (threadId) => this.#onAddedMessage(threadId));
-    this.on('message-deleted', (threadId, deletedCount) => this.#onDeletedMessage(threadId, deletedCount));
-    this.on('messages-sent', (messagesDetails) => this.#onSentMessages(messagesDetails));
+    this.on(MESSAGE_ADDED, (threadId) => this.#onAddedMessage(threadId));
+    this.on(MESSAGE_DELETED, (threadId, deletedCount) => this.#onDeletedMessage(threadId, deletedCount));
+    this.on(MESSAGES_SENT, (messagesDetails) => this.#onSentMessages(messagesDetails));
+    this.on(THREAD_MODIFIED, (user_id) => this.#adjustCache({ event: THREAD_MODIFIED, data: { user_id } }));
+    this.on(MESSAGE_MODIFIED, (data) => this.#adjustCache({ event: MESSAGE_MODIFIED, data }));
   };
 
   #connectMongoClient = async () => {
@@ -37,14 +56,14 @@ class DatabaseController extends EventEmitter {
   #onAddedMessage = async (id) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
-    await threads.updateOne({ _id: ObjectId(id) }, { $inc: { nummess: 1 } });
+    await threads.updateOne({ _id: ObjectId(id) }, { $set: { date: new Date() }, $inc: { nummess: 1 } });
     this.#closeMongoClient();
   };
 
   #onDeletedMessage = async (id, deletedCount) => {
     await this.#connectMongoClient();
     const threads = this.#getCollection('threads');
-    const result = await threads.findOneAndUpdate(
+    await threads.findOneAndUpdate(
       { _id: ObjectId(id) },
       { $inc: { nummess: -deletedCount } },
       { returnOriginal: false }
@@ -123,6 +142,7 @@ class DatabaseController extends EventEmitter {
     const threadsCollection = this.#getCollection('threads');
     const threads = await threadsCollection.find({ user_id }, { limit, skip }).sort({ date: -1 }).toArray();
     this.#closeMongoClient();
+
     return threads;
   };
 
@@ -153,7 +173,7 @@ class DatabaseController extends EventEmitter {
     return { messages, total: totalMessages };
   };
 
-  deleteThread = async (idArray, options = {}) => {
+  deleteThread = async (idArray, options = {}, user_id) => {
     await this.#connectMongoClient();
     const { lastMessageDeleted = false } = options;
     const { deletedCount } = await this.client
@@ -169,6 +189,8 @@ class DatabaseController extends EventEmitter {
     if (!lastMessageDeleted) {
       this.#deleteMessages(idArray);
     }
+
+    this.emit(THREAD_MODIFIED, user_id);
   };
 
   #deleteMessages = async (idArray) => {
@@ -203,7 +225,7 @@ class DatabaseController extends EventEmitter {
     }
 
     this.#closeMongoClient();
-    this.emit('message-deleted', threadId);
+    this.emit(MESSAGE_DELETED, threadId, deletedCount);
     return threadId;
   };
 
@@ -224,9 +246,8 @@ class DatabaseController extends EventEmitter {
     this.#closeMongoClient();
 
     if (collectionName === 'messages') {
-      this.emit('message-added', item.thread_id);
+      this.emit(MESSAGE_ADDED, item.thread_id);
     }
-
     return insertedItem;
   };
 
