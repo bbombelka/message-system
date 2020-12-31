@@ -3,6 +3,7 @@ const ServiceEmitter = require('../event-emitter');
 const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const redisClient = require('../redis');
+const { PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -27,33 +28,34 @@ class Logout extends Service {
 
   processRequest = async () => {
     try {
+      await this.getUser();
       await this.removeTokenFromCache();
-      this.prepareResponse();
-      this.emitEvent('processing-finished');
+      this.setState({ responseBody: 'User correctly logged out.' });
+      this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
       const errorMessage = this.getErrorMessage(error);
       this.finishProcessWithError(...errorMessage);
     }
   };
 
+  getUser = async () => {
+    const user = await this.databaseController.getUser(this.state.login);
+    this.setState({ user });
+  };
+
   removeTokenFromCache = () => {
-    const { login } = this.state;
+    const { _id } = this.state.user;
 
     return new Promise((resolve, reject) => {
-      this.redisCache.del(login, (err, reply) => {
+      this.redisCache.del(_id.toString(), (err, reply) => {
         if (err) reject();
-        if (reply === 0) reject(new Error(login + ' already logged out.'));
+        if (reply === 0) reject(new Error('User already logged out.'));
         resolve();
       });
     });
   };
 
-  prepareResponse = () => {
-    const { login } = this.state;
-    this.setState({ responseBody: login + ' correctly logged out.' });
-  };
-
-  getErrorMessage = error => {
+  getErrorMessage = (error) => {
     return error.code ? ['An error occured while logging out.', 500] : [error.message, 405];
   };
 }

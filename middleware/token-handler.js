@@ -73,7 +73,7 @@ class TokenHandler {
     return new Promise((resolve, reject) => {
       jwt.verify(token, tokenSecret, (err, tokenData) => {
         if (err) {
-          reject(err);
+          return reject(err);
         }
         resolve(tokenData);
       });

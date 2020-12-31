@@ -40,25 +40,25 @@ class RenewToken extends Service {
 
   verifyToken = async () => {
     const { token } = this.state;
-    const { _id, login } = await tokenHandler.performVerification(token, 'refresh');
-    this.setState({ _id, login });
+    const { _id, name } = await tokenHandler.performVerification(token, 'refresh');
+    this.setState({ _id, name });
   };
 
   checkCacheLoginStatus = () => {
-    const { login } = this.state;
+    const { _id } = this.state;
 
     return new Promise((resolve, reject) => {
-      this.redisCache.get(login, (err, reply) => {
-        if (err) reject();
-        if (!reply) reject(new Error(login + ' is logged out.'));
+      this.redisCache.get(_id, (err, reply) => {
+        if (err) reject(new Error('Error during checking cache.'));
+        if (!reply) reject(new Error('User is logged out.'));
         resolve(true);
       });
     });
   };
 
   prepareAccessToken = async () => {
-    const { _id, login } = this.state;
-    const token = await tokenHandler.signToken({ _id, login });
+    const { _id, name } = this.state;
+    const token = await tokenHandler.signToken({ _id, name });
     this.setState('responseBody', { accessToken: token });
   };
 
@@ -68,7 +68,7 @@ class RenewToken extends Service {
     }
 
     if (error.message === 'jwt expired') {
-      this.finishProcessWithError('Provided token has expired.', 401);
+      return this.finishProcessWithError('Provided token has expired.', 401);
     }
 
     this.finishProcessWithError(error.message, 401);

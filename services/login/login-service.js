@@ -56,11 +56,11 @@ class Login extends Service {
   };
 
   checkLoginCacheStatus = () => {
-    const { login } = this.state;
+    const { _id } = this.state.user;
 
     return new Promise((resolve, reject) => {
-      this.redisCache.get(login, (err, reply) => {
-        if (err) reject();
+      this.redisCache.get(_id.toString(), (err, reply) => {
+        if (err) reject(new Error('Error during checking cache.'));
         if (reply) resolve(this.setState('refreshToken', reply));
         resolve();
       });
@@ -101,11 +101,11 @@ class Login extends Service {
   };
 
   cacheRefreshToken = () => {
-    const { login } = this.state.user;
+    const { _id } = this.state.user;
     const { refreshToken } = this.state;
     return new Promise((resolve, reject) => {
-      this.redisCache.setex(login, config.refreshTokenExpirationTime, refreshToken, (err) => {
-        if (err) reject();
+      this.redisCache.setex(_id.toString(), config.refreshTokenExpirationTime, refreshToken, (err) => {
+        if (err) reject(new Error('Error during caching token.'));
         resolve();
       });
     });
