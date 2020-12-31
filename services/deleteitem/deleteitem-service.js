@@ -7,6 +7,7 @@ const Helper = require('../service-helper');
 const redisClient = require('../redis');
 const config = require('../../config');
 const bool = require('../../enums/boolean');
+const { MESSAGE_MODIFIED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -101,6 +102,13 @@ class DeleteItem extends Service {
       this.deleteThread([threadId], { lastMessageDeleted: true });
     }
     this.prepareResponse(messagesLeft);
+    this.databaseController.emit(MESSAGE_MODIFIED, {
+      user_id: this.state.response.locals.tokenData._id,
+      ref: CipheringHandler.encryptData({
+        id: threadId,
+        type: 'T',
+      }),
+    });
   };
 }
 

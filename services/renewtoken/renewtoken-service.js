@@ -4,7 +4,7 @@ const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const tokenHandler = require('../../middleware/token-handler');
 const redisClient = require('../redis');
-
+const { PROCESSING_FINISHED } = require('../../enums/events.enum');
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
@@ -32,7 +32,7 @@ class RenewToken extends Service {
       await this.verifyToken();
       await this.checkCacheLoginStatus();
       await this.prepareAccessToken();
-      this.emitEvent('processing-finished');
+      this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
       this.handleError(error);
     }
@@ -62,7 +62,7 @@ class RenewToken extends Service {
     this.setState('responseBody', { accessToken: token });
   };
 
-  handleError = error => {
+  handleError = (error) => {
     if (error.code) {
       return this.finishProcessWithError('An error occured while renewing the token', 500);
     }

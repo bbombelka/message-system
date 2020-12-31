@@ -70,7 +70,6 @@ class DeleteItem extends Service {
         await this.startNewThread();
       }
     } catch (error) {
-      console.log(error);
       const errorBody = Helper.isDatabaseError(error)
         ? [error.message, error.statusCode]
         : ['There has been a server error', 500];

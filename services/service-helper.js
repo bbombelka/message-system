@@ -8,8 +8,8 @@ class ServiceHelper {
     return { status: 'OK', data };
   }
 
-  static formatErrorResponse(msg) {
-    return { status: 'ERROR', msg };
+  static formatErrorResponse(msg, code) {
+    return { status: 'ERROR', msg, code };
   }
 
   static getDbFilePath(dbType) {

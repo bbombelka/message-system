@@ -93,19 +93,21 @@ class Service {
   };
   onSuccesfulValidation = (requestProcess) => requestProcess();
 
-  finishProcessWithError = (errorMessage, statusCode = 404) => {
+  finishProcessWithError = (errorMessage, statusCode = 404, errorCode = '000') => {
     this.setState({
       statusCode,
       responseBody: errorMessage,
       error: true,
+      errorCode,
     });
     this.emitEvent(PROCESSING_FINISHED);
   };
 
   sendResponse = () => {
-    const { responseBody, response, error, statusCode } = this.state;
+    const { responseBody, response, error, errorCode, statusCode } = this.state;
+
     error
-      ? response.status(statusCode).json(ServiceHelper.formatErrorResponse(responseBody))
+      ? response.status(statusCode).json(ServiceHelper.formatErrorResponse(responseBody, errorCode))
       : response.status(200).json(ServiceHelper.formatResponse(responseBody));
   };
 

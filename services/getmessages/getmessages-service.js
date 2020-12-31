@@ -7,7 +7,7 @@ const CipheringHandler = require('../../common/ciphering-handler');
 const Helper = require('./getmessages-helper');
 const redisClient = require('../redis');
 const config = require('../../config');
-const { MESSAGES_SENT, PROCESSING_FINISHED } = require('../../enums/events.enum');
+const { MESSAGES_SENT, THREAD_MODIFIED, PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -69,6 +69,7 @@ class GetMessages extends Service {
     this.emitEvent(PROCESSING_FINISHED);
     if (Helper.payloadHasUnreadMessages(this.state.messages)) {
       this.databaseController.emit(MESSAGES_SENT, this.getSentMessagesDetails());
+      this.databaseController.emit(THREAD_MODIFIED, this.state.response.locals.tokenData._id);
     }
   };
 

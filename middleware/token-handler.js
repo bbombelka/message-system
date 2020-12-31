@@ -4,12 +4,19 @@ const config = require('../config');
 const protectedRoutes = require('../enums/protected-routes');
 const fs = require('fs');
 
+const errorsMapper = {
+  GENERIC: ['An error occured relating web token.', '010'],
+  INVALID_TOKEN: ['Provided token is invalid.', '013'],
+  TOKEN_EXPIRED: ['Provided token has expired.', '011'],
+  MISSING_HEADER: ['Missing authorization header.', '012'],
+};
+
 class TokenHandler {
   constructor() {
     this.#prepareTokenSecret();
   }
 
-  #getSignTokenOptions = type => {
+  #getSignTokenOptions = (type) => {
     return type === 'access'
       ? [this.accessTokenSecret, { expiresIn: config.accessTokenExpirationTime }]
       : [this.refreshTokenSecret, { expiresIn: config.refreshTokenExpirationTime }];
@@ -41,13 +48,13 @@ class TokenHandler {
     }
   };
 
-  #isProtectedRoute = url => {
+  #isProtectedRoute = (url) => {
     return protectedRoutes.includes(url);
   };
 
-  #getToken = request => {
+  #getToken = (request) => {
     if (!request.headers['authorization']) {
-      throw new Error('h');
+      throw new Error('missing header');
     }
     const token = request.headers['authorization'].split(' ')[1];
     const rule = new RegExp('[^a-z0-9._-]', 'ig');
@@ -75,31 +82,31 @@ class TokenHandler {
 
   #handleError = (error, response) => {
     const errorMessage = this.#getErrorMessage(error);
-    response.status(403).json(ServiceHelper.formatErrorResponse(errorMessage));
+    response.status(403).json(ServiceHelper.formatErrorResponse(...errorMessage));
   };
 
   #getErrorMessage = ({ message }) => {
     switch (message) {
       case 'invalid token':
-        return 'Provided token is invalid.';
+        return errorsMapper.INVALID_TOKEN;
       case 'jwt expired':
-        return 'Provided token has expired.';
-      case 'h':
-        return 'Missing authorization header.';
+        return errorsMapper.TOKEN_EXPIRED;
+      case 'missing header':
+        return errorsMapper.MISSING_HEADER;
       default:
-        return 'An error occured relating web token.';
+        return errorsMapper.GENERIC;
     }
   };
 
   #prepareTokenSecret = () => {
     fs.promises
       .readFile(config.tokenSecretPath)
-      .then(fileContent => {
+      .then((fileContent) => {
         const data = JSON.parse(fileContent.toString());
         this.accessTokenSecret = data['ACCESS_TOKEN_SECRET'];
         this.refreshTokenSecret = data['REFRESH_TOKEN_SECRET'];
       })
-      .catch(error => console.log(error));
+      .catch((error) => console.log(error));
   };
 }
 

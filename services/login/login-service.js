@@ -5,6 +5,8 @@ const DatabaseController = require('../../database/database-controller');
 const tokenHandler = require('../../middleware/token-handler');
 const cipheringHandler = require('../../common/ciphering-handler');
 const redisClient = require('../redis');
+const config = require('../../config');
+const { PROCESSING_FINISHED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -37,12 +39,18 @@ class Login extends Service {
       await this.verifyUser();
       await this.checkLoginCacheStatus();
       await this.prepareAccessToken();
-      await this.prepareRefreshToken();
-      await this.cacheRefreshToken();
+      if (!this.state.refreshToken) {
+        await this.prepareRefreshToken();
+        this.cacheRefreshToken();
+      }
       this.prepareResponse();
-      this.emitEvent('processing-finished');
+      this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
       const errorMessage = this.getErrorMessage(error);
+      if (this.state.exception) {
+        return this.prepareExceptionResponse();
+      }
+
       this.finishProcessWithError(...errorMessage);
     }
   };
@@ -53,7 +61,7 @@ class Login extends Service {
     return new Promise((resolve, reject) => {
       this.redisCache.get(login, (err, reply) => {
         if (err) reject();
-        if (reply) reject(new Error(login + ' is already logged in.'));
+        if (reply) resolve(this.setState('refreshToken', reply));
         resolve();
       });
     });
@@ -76,14 +84,14 @@ class Login extends Service {
   };
 
   prepareAccessToken = async () => {
-    const { _id, login } = this.state.user;
-    const token = await tokenHandler.signToken({ _id, login });
+    const { _id, name } = this.state.user;
+    const token = await tokenHandler.signToken({ _id, name });
     this.setState('accessToken', token);
   };
 
   prepareRefreshToken = async () => {
-    const { _id, login } = this.state.user;
-    const token = await tokenHandler.signToken({ _id, login }, 'refresh');
+    const { _id, name } = this.state.user;
+    const token = await tokenHandler.signToken({ _id, name }, 'refresh');
     this.setState('refreshToken', token);
   };
 
@@ -96,14 +104,14 @@ class Login extends Service {
     const { login } = this.state.user;
     const { refreshToken } = this.state;
     return new Promise((resolve, reject) => {
-      this.redisCache.setex(login, 1800, refreshToken, (err, reply) => {
+      this.redisCache.setex(login, config.refreshTokenExpirationTime, refreshToken, (err) => {
         if (err) reject();
         resolve();
       });
     });
   };
 
-  getErrorMessage = error => {
+  getErrorMessage = (error) => {
     return error.code ? ['An error occured while logging out.', 500] : [error.message, 405];
   };
 }

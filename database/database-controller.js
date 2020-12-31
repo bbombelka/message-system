@@ -12,6 +12,7 @@ const {
   MESSAGES_SENT,
   THREAD_MODIFIED,
 } = require('../enums/events.enum');
+const { cacheIsDisabled } = require('../config');
 
 class DatabaseController extends EventEmitter {
   constructor() {
@@ -32,8 +33,11 @@ class DatabaseController extends EventEmitter {
     this.on(MESSAGE_ADDED, (threadId) => this.#onAddedMessage(threadId));
     this.on(MESSAGE_DELETED, (threadId, deletedCount) => this.#onDeletedMessage(threadId, deletedCount));
     this.on(MESSAGES_SENT, (messagesDetails) => this.#onSentMessages(messagesDetails));
-    this.on(THREAD_MODIFIED, (user_id) => this.#adjustCache({ event: THREAD_MODIFIED, data: { user_id } }));
-    this.on(MESSAGE_MODIFIED, (data) => this.#adjustCache({ event: MESSAGE_MODIFIED, data }));
+    this.on(
+      THREAD_MODIFIED,
+      (user_id) => !cacheIsDisabled && this.#adjustCache({ event: THREAD_MODIFIED, data: { user_id } })
+    );
+    this.on(MESSAGE_MODIFIED, (data) => !cacheIsDisabled && this.#adjustCache({ event: MESSAGE_MODIFIED, data }));
   };
 
   #connectMongoClient = async () => {
