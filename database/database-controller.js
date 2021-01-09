@@ -424,6 +424,13 @@ class DatabaseController extends EventEmitter {
     }
     return user;
   };
+
+  getThreadId = async (messageId) => {
+    await this.#connectMongoClient();
+    const messageCollection = this.#getCollection('messages');
+    const { thread_id = null } = await messageCollection.findOne({ _id: ObjectId(messageId) });
+    return thread_id;
+  };
 }
 
 module.exports = new DatabaseController();

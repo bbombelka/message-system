@@ -37,9 +37,7 @@ class GetAttachment extends Service {
   processRequest = async () => {
     try {
       this.decodeRef();
-      this.state.getAllAttachments
-        ? await this.processAllAttachments()
-        : await this.processSingleAttachment();
+      this.state.getAllAttachments ? await this.processAllAttachments() : await this.processSingleAttachment();
     } catch (error) {
       const errorMessage = this.getErrorMessage(error);
       this.finishProcessWithError(...errorMessage);
@@ -89,9 +87,7 @@ class GetAttachment extends Service {
   mergeDetails = (attachmentsBinaries) => {
     const { decipheredAttachmentDetails } = this.state;
     const ids = decipheredAttachmentDetails.map((detail) => detail.id);
-    const checkedBinaryAttachments = attachmentsBinaries.filter(({ _id }) =>
-      ids.includes(_id.toString())
-    );
+    const checkedBinaryAttachments = attachmentsBinaries.filter(({ _id }) => ids.includes(_id.toString()));
     [checkedBinaryAttachments, decipheredAttachmentDetails].forEach((details) =>
       details.sort((a, b) => Number(a.id) - Number(b.id))
     );
@@ -144,7 +140,7 @@ class GetAttachment extends Service {
 
   processSingleAttachment = async () => {
     await this.prepareFile();
-    if (config.cacheIsDisabled) {
+    if (config.isFileCacheDisabled) {
       return this.streamFile();
     }
     await this.saveFileToCache();

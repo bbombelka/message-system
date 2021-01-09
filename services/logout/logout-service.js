@@ -30,6 +30,7 @@ class Logout extends Service {
     try {
       await this.getUser();
       await this.removeTokenFromCache();
+      this.removeCachedUserData();
       this.setState({ responseBody: 'User correctly logged out.' });
       this.emitEvent(PROCESSING_FINISHED);
     } catch (error) {
@@ -52,6 +53,14 @@ class Logout extends Service {
         if (reply === 0) reject(new Error('User already logged out.'));
         resolve();
       });
+    });
+  };
+
+  removeCachedUserData = () => {
+    const { _id } = this.state.user;
+
+    redisClient.scan('0', 'MATCH', _id + '*', 'COUNT', '100', (err, [_, keys]) => {
+      keys.forEach((key) => redisClient.del(key, (err, number) => console.log(err, key)));
     });
   };
 

@@ -4,6 +4,7 @@ const path = require('path');
 const DatabaseController = require('../../database/database-controller');
 const CipheringHandler = require('../../common/ciphering-handler');
 const ServiceHelper = require('../service-helper');
+const { PROCESSING_FINISHED, MESSAGE_MODIFIED } = require('../../enums/events.enum');
 
 const options = {
   prefix: path.basename(__filename, '.js'),
@@ -36,6 +37,7 @@ class DeleteAttachment extends Service {
       await this.deleteAttachmentFromDatabase();
       this.prepareResponse();
       this.emitEvent('processing-finished');
+      this.adjustCache();
     } catch (error) {
       const errorMessage = this.getErrorMessage(error);
       this.finishProcessWithError(...errorMessage);
@@ -62,10 +64,20 @@ class DeleteAttachment extends Service {
     const { id, ref } = this.state;
     const { message_id } = await this.databaseController.deleteAttachmentBinary(id);
     await this.databaseController.deleteAttachmentDetails(message_id, ref);
+    this.setState({ message_id });
   };
 
   prepareResponse = () => {
     this.setState('responseBody', { ref: this.state.ref });
+  };
+
+  adjustCache = async () => {
+    const { message_id } = this.state;
+    const user_id = this.state.response.locals.tokenData._id;
+    const thread_id = await this.databaseController.getThreadId(message_id);
+    const threadRef = CipheringHandler.encryptData({ id: thread_id, type: 'T' });
+
+    this.databaseController.emit(MESSAGE_MODIFIED, { ref: threadRef, user_id });
   };
 }
 

@@ -5,6 +5,7 @@ const DatabaseController = require('../../database/database-controller');
 const tokenHandler = require('../../middleware/token-handler');
 const redisClient = require('../redis');
 const { PROCESSING_FINISHED } = require('../../enums/events.enum');
+
 const options = {
   prefix: path.basename(__filename, '.js'),
 };
@@ -68,7 +69,7 @@ class RenewToken extends Service {
     }
 
     if (error.message === 'jwt expired') {
-      return this.finishProcessWithError('Provided token has expired.', 401);
+      return this.finishProcessWithError('Provided refresh token has expired.', 401, '015');
     }
 
     this.finishProcessWithError(error.message, 401);
