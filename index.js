@@ -6,6 +6,7 @@ const logger = require('./middleware/logger');
 const conditional = require('express-conditional-middleware');
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
+const path = require('path');
 
 server.use(cors());
 server.use(
@@ -17,6 +18,7 @@ server.use(
 server.use(express.urlencoded());
 server.use(express.json());
 server.use(conditional(process.argv.includes('logger'), logger.log, null));
+server.use(express.static(path.join(__dirname, 'build')));
 server.use('/', services);
 
 server.listen(PORT, () => {
